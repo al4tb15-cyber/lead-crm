@@ -33,19 +33,29 @@ export class ApiClient {
     return this.tenantId;
   }
 
-  private async request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
+  private async request<T>(endpoint: string, options: RequestInit = {}, retries = 2): Promise<T> {
     const headers = {
       'Content-Type': 'application/json',
       'x-tenant-id': this.tenantId,
       ...(options.headers || {})
     };
 
-    const res = await fetch(endpoint, { ...options, headers });
-    if (!res.ok) {
-      const errorData = await res.json().catch(() => ({}));
-      throw new Error(errorData.error || `HTTP error ${res.status}`);
+    try {
+      const res = await fetch(endpoint, { ...options, headers });
+      if (!res.ok) {
+        const errorData = await res.json().catch(() => ({}));
+        throw new Error(errorData.error || `HTTP error ${res.status}`);
+      }
+      return res.json();
+    } catch (err: any) {
+      if (retries > 0 && (!err.message || err.message.includes('Failed to fetch') || err.message.includes('NetworkError'))) {
+        // Wait 300ms and retry
+        await new Promise(r => setTimeout(r, 300));
+        return this.request<T>(endpoint, options, retries - 1);
+      }
+      console.warn(`[ApiClient] Request to ${endpoint} failed:`, err.message || err);
+      throw err;
     }
-    return res.json();
   }
 
   // Auth
