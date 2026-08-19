@@ -8,6 +8,7 @@ import { LeadDiscoveryView } from './components/leadgen/LeadDiscoveryView.tsx';
 import { AgentsHubView } from './components/agents/AgentsHubView.tsx';
 import { OmnichannelInbox } from './components/communications/OmnichannelInbox.tsx';
 import { VoiceCenterView } from './components/voice/VoiceCenterView.tsx';
+import { VoiceStudioView } from './components/voice/VoiceStudioView.tsx';
 import { CalendarBookingsView } from './components/calendar/CalendarBookingsView.tsx';
 import { KnowledgeBaseView } from './components/knowledge/KnowledgeBaseView.tsx';
 import { CampaignsView } from './components/campaigns/CampaignsView.tsx';
@@ -124,7 +125,13 @@ const AppContent: React.FC = () => {
           )}
           {currentView === 'agents' && <AgentsHubView />}
           {currentView === 'inbox' && <OmnichannelInbox initialLead={activeInboxLead} />}
-          {currentView === 'voice' && <VoiceCenterView initialLead={activeVoiceLead} />}
+          {currentView === 'voice' && (
+            <VoiceCenterView
+              initialLead={activeVoiceLead}
+              onNavigateToVoiceStudio={() => setCurrentView('voice_studio')}
+            />
+          )}
+          {currentView === 'voice_studio' && <VoiceStudioView />}
           {currentView === 'calendar' && <CalendarBookingsView />}
           {currentView === 'knowledge' && <KnowledgeBaseView />}
           {currentView === 'campaigns' && <CampaignsView />}

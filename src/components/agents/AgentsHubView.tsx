@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useTenant } from '../../context/TenantContext.tsx';
 import { api } from '../../api/client.ts';
-import { AgentConfig, ChannelType } from '../../types/index.ts';
+import { AgentConfig, ChannelType, CustomVoice } from '../../types/index.ts';
 import {
   Bot,
   Settings2,
@@ -15,9 +15,13 @@ import {
   Cpu,
   Save,
   Play,
+  Pause,
   X,
   Sliders,
-  BookOpen
+  BookOpen,
+  Mic,
+  Volume2,
+  AudioLines
 } from 'lucide-react';
 
 const AVAILABLE_TOOLS = [
@@ -34,8 +38,12 @@ const AVAILABLE_TOOLS = [
 export const AgentsHubView: React.FC = () => {
   const { activeTenant, addToast } = useTenant();
   const [agents, setAgents] = useState<AgentConfig[]>([]);
+  const [customVoices, setCustomVoices] = useState<CustomVoice[]>([]);
   const [selectedAgent, setSelectedAgent] = useState<AgentConfig | null>(null);
   const [loading, setLoading] = useState(true);
+
+  // Voice speech test player state
+  const [isPlayingVoice, setIsPlayingVoice] = useState(false);
 
   // Sandbox testing state
   const [testPrompt, setTestPrompt] = useState('Hi, I am interested in your services. Can you book me a discovery call tomorrow afternoon?');
@@ -51,10 +59,14 @@ export const AgentsHubView: React.FC = () => {
     if (!activeTenant) return;
     setLoading(true);
     try {
-      const data = await api.getAgents();
-      setAgents(data);
-      if (data.length > 0 && !selectedAgent) {
-        setSelectedAgent(data[0]);
+      const [agentData, voiceData] = await Promise.all([
+        api.getAgents(),
+        api.getCustomVoices()
+      ]);
+      setAgents(agentData);
+      setCustomVoices(voiceData);
+      if (agentData.length > 0 && !selectedAgent) {
+        setSelectedAgent(agentData[0]);
       }
     } catch (e) {
       console.error(e);
@@ -86,6 +98,75 @@ export const AgentsHubView: React.FC = () => {
       : [...current, toolId];
 
     setSelectedAgent({ ...selectedAgent, enabledTools: updatedTools });
+  };
+
+  const handleSelectVoice = (voiceId: string) => {
+    if (!selectedAgent) return;
+    const voice = customVoices.find(v => v.id === voiceId);
+    if (!voice) return;
+
+    setSelectedAgent({
+      ...selectedAgent,
+      voiceConfig: {
+        voiceId: voice.id,
+        voiceName: voice.name,
+        provider: voice.provider,
+        gender: voice.gender,
+        accent: voice.accent,
+        speed: voice.settings?.speed || 1.0,
+        pitch: voice.settings?.pitch || 1.0,
+        stability: voice.settings?.stability || 85,
+        similarityBoost: voice.settings?.similarityBoost || 90,
+        greetingScript: selectedAgent.voiceConfig?.greetingScript || voice.sampleScript || `G'day! This is ${selectedAgent.name} calling from Business HUB.`
+      }
+    });
+  };
+
+  const handleTestVoiceAudio = () => {
+    if (!selectedAgent || typeof window === 'undefined' || !('speechSynthesis' in window)) {
+      addToast({
+        type: 'info',
+        title: 'Speech Player',
+        message: 'Synthesizing voice playback test.'
+      });
+      return;
+    }
+
+    const textToSpeak = selectedAgent.voiceConfig?.greetingScript || `G'day! This is ${selectedAgent.name} with your custom voice profile configured.`;
+
+    window.speechSynthesis.cancel();
+    setIsPlayingVoice(true);
+
+    const utterance = new SpeechSynthesisUtterance(textToSpeak);
+    utterance.rate = selectedAgent.voiceConfig?.speed || 1.0;
+    utterance.pitch = selectedAgent.voiceConfig?.pitch || 1.0;
+
+    const availableVoices = window.speechSynthesis.getVoices();
+    const isFemale = selectedAgent.voiceConfig?.gender === 'female';
+    const isMale = selectedAgent.voiceConfig?.gender === 'male';
+
+    let matchedVoice = availableVoices.find(v => {
+      const matchLang = v.lang.toLowerCase().includes('en-au') || v.lang.toLowerCase().includes('en');
+      if (isFemale) return matchLang && (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('karen') || v.name.toLowerCase().includes('samantha'));
+      if (isMale) return matchLang && (v.name.toLowerCase().includes('male') || v.name.toLowerCase().includes('david') || v.name.toLowerCase().includes('alex'));
+      return matchLang;
+    }) || availableVoices.find(v => v.lang.startsWith('en')) || availableVoices[0];
+
+    if (matchedVoice) {
+      utterance.voice = matchedVoice;
+    }
+
+    utterance.onend = () => setIsPlayingVoice(false);
+    utterance.onerror = () => setIsPlayingVoice(false);
+
+    window.speechSynthesis.speak(utterance);
+  };
+
+  const handleStopVoiceAudio = () => {
+    if (typeof window !== 'undefined' && 'speechSynthesis' in window) {
+      window.speechSynthesis.cancel();
+      setIsPlayingVoice(false);
+    }
   };
 
   const handleRunSandboxTest = async () => {
@@ -246,6 +327,199 @@ export const AgentsHubView: React.FC = () => {
                   disabled
                   value={selectedAgent.model}
                   className="w-full bg-slate-950/50 border border-slate-800 rounded-xl px-3 py-2 text-xs text-slate-400 font-mono"
+                />
+              </div>
+            </div>
+
+            {/* Custom Voice & Calling Speech Configuration */}
+            <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-950/40 via-purple-950/20 to-slate-950 border border-indigo-500/30 space-y-4">
+              <div className="flex items-center justify-between border-b border-indigo-500/20 pb-3">
+                <div className="flex items-center gap-2">
+                  <div className="w-8 h-8 rounded-lg bg-rose-500/20 text-rose-300 flex items-center justify-center">
+                    <Mic className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-xs font-bold text-white uppercase tracking-wider">
+                      Agent Calling Voice Profile & Neural Tuning
+                    </h3>
+                    <p className="text-[11px] text-white/50">
+                      Select or clone a custom voice specifically assigned to {selectedAgent.name}.
+                    </p>
+                  </div>
+                </div>
+
+                {/* Voice Test Button */}
+                <div className="flex items-center gap-2">
+                  {isPlayingVoice ? (
+                    <button
+                      onClick={handleStopVoiceAudio}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-rose-600 hover:bg-rose-700 text-white text-xs font-bold shadow-sm animate-pulse cursor-pointer"
+                    >
+                      <Pause className="w-3.5 h-3.5" />
+                      Stop Speaking
+                    </button>
+                  ) : (
+                    <button
+                      onClick={handleTestVoiceAudio}
+                      className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-rose-500 to-indigo-600 hover:from-rose-600 hover:to-indigo-700 text-white text-xs font-bold shadow-md shadow-rose-500/20 transition-all hover:scale-105 cursor-pointer"
+                    >
+                      <Volume2 className="w-3.5 h-3.5" />
+                      Test Voice Audio
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Voice Selector Dropdown */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-white/70 mb-1">
+                    Assigned Voice Profile
+                  </label>
+                  <select
+                    value={selectedAgent.voiceConfig?.voiceId || customVoices[0]?.id || ''}
+                    onChange={e => handleSelectVoice(e.target.value)}
+                    className="w-full bg-slate-900 border border-indigo-500/30 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-indigo-400"
+                  >
+                    {customVoices.map(v => (
+                      <option key={v.id} value={v.id}>
+                        {v.name} ({v.accent}) {v.isRecordedByMe ? '• [Custom Clone]' : '• [Neural Engine]'}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-semibold text-white/70 mb-1">
+                    Voice Provider & Engine
+                  </label>
+                  <div className="bg-slate-900/70 border border-white/10 rounded-xl px-3 py-2 text-xs text-indigo-300 font-mono flex items-center justify-between">
+                    <span>{selectedAgent.voiceConfig?.provider || 'Gemini Neural Audio'}</span>
+                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-indigo-500/20 text-indigo-300">
+                      {selectedAgent.voiceConfig?.accent || 'en-AU'}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Speech Sliders */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-1">
+                <div>
+                  <div className="flex justify-between text-[11px] text-white/70 mb-1 font-medium">
+                    <span>Speaking Speed</span>
+                    <span className="font-mono text-indigo-300">{selectedAgent.voiceConfig?.speed || 1.0}x</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.75"
+                    max="1.35"
+                    step="0.05"
+                    value={selectedAgent.voiceConfig?.speed || 1.0}
+                    onChange={e =>
+                      setSelectedAgent({
+                        ...selectedAgent,
+                        voiceConfig: {
+                          ...(selectedAgent.voiceConfig || {
+                            voiceId: 'voice_exec_au',
+                            voiceName: 'Alexander Sterling',
+                            provider: 'custom_recorded',
+                            gender: 'male',
+                            accent: 'en-AU (Australian)'
+                          }),
+                          speed: parseFloat(e.target.value)
+                        }
+                      })
+                    }
+                    className="w-full accent-indigo-500 cursor-pointer"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-[11px] text-white/70 mb-1 font-medium">
+                    <span>Pitch Modulation</span>
+                    <span className="font-mono text-indigo-300">{selectedAgent.voiceConfig?.pitch || 1.0}x</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="0.8"
+                    max="1.2"
+                    step="0.05"
+                    value={selectedAgent.voiceConfig?.pitch || 1.0}
+                    onChange={e =>
+                      setSelectedAgent({
+                        ...selectedAgent,
+                        voiceConfig: {
+                          ...(selectedAgent.voiceConfig || {
+                            voiceId: 'voice_exec_au',
+                            voiceName: 'Alexander Sterling',
+                            provider: 'custom_recorded',
+                            gender: 'male',
+                            accent: 'en-AU (Australian)'
+                          }),
+                          pitch: parseFloat(e.target.value)
+                        }
+                      })
+                    }
+                    className="w-full accent-indigo-500 cursor-pointer"
+                  />
+                </div>
+
+                <div>
+                  <div className="flex justify-between text-[11px] text-white/70 mb-1 font-medium">
+                    <span>Voice Stability</span>
+                    <span className="font-mono text-indigo-300">{selectedAgent.voiceConfig?.stability || 85}%</span>
+                  </div>
+                  <input
+                    type="range"
+                    min="40"
+                    max="100"
+                    step="5"
+                    value={selectedAgent.voiceConfig?.stability || 85}
+                    onChange={e =>
+                      setSelectedAgent({
+                        ...selectedAgent,
+                        voiceConfig: {
+                          ...(selectedAgent.voiceConfig || {
+                            voiceId: 'voice_exec_au',
+                            voiceName: 'Alexander Sterling',
+                            provider: 'custom_recorded',
+                            gender: 'male',
+                            accent: 'en-AU (Australian)'
+                          }),
+                          stability: parseInt(e.target.value)
+                        }
+                      })
+                    }
+                    className="w-full accent-indigo-500 cursor-pointer"
+                  />
+                </div>
+              </div>
+
+              {/* Agent Greeting Script */}
+              <div>
+                <label className="block text-xs font-semibold text-white/70 mb-1">
+                  Custom Phone Greeting Script
+                </label>
+                <textarea
+                  rows={2}
+                  value={selectedAgent.voiceConfig?.greetingScript || ''}
+                  onChange={e =>
+                    setSelectedAgent({
+                      ...selectedAgent,
+                      voiceConfig: {
+                        ...(selectedAgent.voiceConfig || {
+                          voiceId: 'voice_exec_au',
+                          voiceName: 'Alexander Sterling',
+                          provider: 'custom_recorded',
+                          gender: 'male',
+                          accent: 'en-AU (Australian)'
+                        }),
+                        greetingScript: e.target.value
+                      }
+                    })
+                  }
+                  placeholder={`G'day! This is ${selectedAgent.name} calling from Business HUB...`}
+                  className="w-full bg-slate-900 border border-white/15 rounded-xl p-2.5 text-xs text-white placeholder-white/40 focus:outline-none focus:border-indigo-400"
                 />
               </div>
             </div>

@@ -29,7 +29,10 @@ import {
   Invoice, 
   PaymentTransaction, 
   EmailDispatchLog, 
-  User 
+  User,
+  CustomVoice,
+  DepartmentRole,
+  RbacAuditLog
 } from './src/types/index.ts';
 
 async function startServer() {
@@ -192,8 +195,188 @@ async function startServer() {
 
   app.get('/api/users', (req, res) => {
     const tenantId = (req as any).tenantId;
-    const users = Array.from(db.users.values()).filter(u => u.tenantId === tenantId || u.role === 'super_admin');
+    const users = db.getUsers(tenantId);
     res.json(users);
+  });
+
+  // ==========================================
+  // RBAC & GRANULAR PERMISSIONS API
+  // ==========================================
+  app.get('/api/rbac/roles', (req, res) => {
+    const tenantId = (req as any).tenantId;
+    const roles = db.getDepartmentRoles(tenantId);
+    res.json(roles);
+  });
+
+  app.post('/api/rbac/roles', (req, res) => {
+    const tenantId = (req as any).tenantId;
+    const roleId = `role_${Math.random().toString(36).substr(2, 9)}_${tenantId}`;
+    const newRole: DepartmentRole = {
+      id: roleId,
+      tenantId,
+      name: req.body.name || 'Custom Department Role',
+      department: req.body.department || 'sales',
+      description: req.body.description || '',
+      isSystemDefault: false,
+      color: req.body.color || '#6366f1',
+      permissions: Array.isArray(req.body.permissions) ? req.body.permissions : [],
+      assignedUsersCount: 0,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    const saved = db.createDepartmentRole(newRole);
+
+    db.addRbacAuditLog({
+      id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+      tenantId,
+      actorId: 'usr_super_admin',
+      actorName: 'Alexander Ross',
+      action: 'create_role',
+      targetType: 'role',
+      targetName: saved.name,
+      details: `Created new ${saved.department.toUpperCase()} role with ${saved.permissions.length} granular permissions.`,
+      timestamp: new Date().toISOString()
+    });
+
+    res.status(201).json(saved);
+  });
+
+  app.put('/api/rbac/roles/:id', (req, res) => {
+    const tenantId = (req as any).tenantId;
+    const updated = db.updateDepartmentRole(req.params.id, req.body);
+    if (!updated) return res.status(404).json({ error: 'Role not found' });
+
+    db.addRbacAuditLog({
+      id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+      tenantId,
+      actorId: 'usr_super_admin',
+      actorName: 'Alexander Ross',
+      action: 'update_permissions',
+      targetType: 'role',
+      targetName: updated.name,
+      details: `Updated permissions matrix (${updated.permissions.length} active grants) and role metadata.`,
+      timestamp: new Date().toISOString()
+    });
+
+    res.json(updated);
+  });
+
+  app.delete('/api/rbac/roles/:id', (req, res) => {
+    const tenantId = (req as any).tenantId;
+    const existing = db.getDepartmentRole(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'Role not found' });
+    if (existing.isSystemDefault) {
+      return res.status(400).json({ error: 'System default department roles cannot be deleted.' });
+    }
+
+    const success = db.deleteDepartmentRole(req.params.id);
+    if (success) {
+      db.addRbacAuditLog({
+        id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        tenantId,
+        actorId: 'usr_super_admin',
+        actorName: 'Alexander Ross',
+        action: 'delete_role',
+        targetType: 'role',
+        targetName: existing.name,
+        details: `Deleted custom department role '${existing.name}' from ${existing.department.toUpperCase()} department.`,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    res.json({ success });
+  });
+
+  app.get('/api/rbac/audit-logs', (req, res) => {
+    const tenantId = (req as any).tenantId;
+    const logs = db.getRbacAuditLogs(tenantId);
+    res.json(logs);
+  });
+
+  // User Management with RBAC assignments
+  app.post('/api/rbac/users', (req, res) => {
+    const tenantId = (req as any).tenantId;
+    const userId = `usr_${Math.random().toString(36).substr(2, 9)}_${tenantId}`;
+    const newUser: User = {
+      id: userId,
+      tenantId,
+      name: req.body.name || 'New Team Member',
+      email: req.body.email || `user_${Date.now()}@businesshub.app`,
+      role: req.body.role || 'staff',
+      department: req.body.department || 'sales',
+      customRoleId: req.body.customRoleId,
+      customRoleName: req.body.customRoleName,
+      jobTitle: req.body.jobTitle || 'Specialist',
+      active: req.body.active ?? true,
+      mfaEnabled: req.body.mfaEnabled ?? false,
+      customPermissions: req.body.customPermissions || [],
+      companyName: req.body.companyName || 'Business HUB Australia',
+      createdAt: new Date().toISOString(),
+      lastLogin: new Date().toISOString()
+    };
+
+    const saved = db.createUser(newUser);
+
+    db.addRbacAuditLog({
+      id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+      tenantId,
+      actorId: 'usr_super_admin',
+      actorName: 'Alexander Ross',
+      action: 'user_invited',
+      targetType: 'user',
+      targetName: saved.name,
+      details: `Provisioned user access for ${saved.email} assigned to ${saved.department?.toUpperCase() || 'GENERAL'} department with role '${saved.customRoleName || saved.role}'.`,
+      timestamp: new Date().toISOString()
+    });
+
+    res.status(201).json(saved);
+  });
+
+  app.put('/api/rbac/users/:id', (req, res) => {
+    const tenantId = (req as any).tenantId;
+    const updated = db.updateUser(req.params.id, req.body);
+    if (!updated) return res.status(404).json({ error: 'User not found' });
+
+    db.addRbacAuditLog({
+      id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+      tenantId,
+      actorId: 'usr_super_admin',
+      actorName: 'Alexander Ross',
+      action: 'assign_role',
+      targetType: 'user',
+      targetName: updated.name,
+      details: `Updated user access profile: Department '${updated.department || 'None'}', Role '${updated.customRoleName || updated.role}', Active Status: ${updated.active}.`,
+      timestamp: new Date().toISOString()
+    });
+
+    res.json(updated);
+  });
+
+  app.delete('/api/rbac/users/:id', (req, res) => {
+    const tenantId = (req as any).tenantId;
+    const existing = db.getUser(req.params.id);
+    if (!existing) return res.status(404).json({ error: 'User not found' });
+    if (existing.role === 'super_admin') {
+      return res.status(400).json({ error: 'Platform Super Admin cannot be deleted.' });
+    }
+
+    const success = db.deleteUser(req.params.id);
+    if (success) {
+      db.addRbacAuditLog({
+        id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+        tenantId,
+        actorId: 'usr_super_admin',
+        actorName: 'Alexander Ross',
+        action: 'user_status_changed',
+        targetType: 'user',
+        targetName: existing.name,
+        details: `Revoked workspace access and deleted user account (${existing.email}).`,
+        timestamp: new Date().toISOString()
+      });
+    }
+
+    res.json({ success });
   });
 
   // ==========================================
@@ -860,8 +1043,72 @@ async function startServer() {
   });
 
   // ==========================================
-  // 10. VOICE CALLS & REAL-TIME AUDIO
+  // 10. VOICE CALLS, CUSTOM VOICE CLONING & REAL-TIME AUDIO
   // ==========================================
+  app.get('/api/custom-voices', (req, res) => {
+    const tenantId = (req as any).tenantId;
+    res.json(db.getCustomVoices(tenantId));
+  });
+
+  app.post('/api/custom-voices', (req, res) => {
+    const tenantId = (req as any).tenantId;
+    const voiceId = 'voice_' + Math.random().toString(36).substr(2, 9) + `_${tenantId}`;
+    const newVoice: CustomVoice = {
+      id: voiceId,
+      tenantId,
+      name: req.body.name || 'Custom Executive Voice',
+      description: req.body.description || 'Custom recorded/cloned AI calling voice profile',
+      gender: req.body.gender || 'neutral',
+      accent: req.body.accent || 'en-AU (Australian)',
+      language: req.body.language || 'English (Australian)',
+      provider: req.body.provider || 'custom_recorded',
+      sampleAudioUrl: req.body.sampleAudioUrl || '',
+      audioDurationSeconds: req.body.audioDurationSeconds || 30,
+      isRecordedByMe: req.body.isRecordedByMe !== undefined ? req.body.isRecordedByMe : true,
+      sampleScript: req.body.sampleScript || 'Hello, I am calling to discuss our partnership options.',
+      settings: {
+        speed: req.body.settings?.speed || 1.0,
+        pitch: req.body.settings?.pitch || 1.0,
+        stability: req.body.settings?.stability || 85,
+        similarityBoost: req.body.settings?.similarityBoost || 90,
+        styleExaggeration: req.body.settings?.styleExaggeration || 15,
+        noiseReduction: req.body.settings?.noiseReduction !== undefined ? req.body.settings.noiseReduction : true
+      },
+      labels: req.body.labels || ['Custom Cloned', 'Live Calling'],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    db.createCustomVoice(newVoice);
+
+    eventBus.emit({
+      tenantId,
+      eventType: 'custom_voice.created' as any,
+      summary: `New custom voice profile "${newVoice.name}" synthesized and added to voice library.`,
+      details: { voiceId: newVoice.id, provider: newVoice.provider }
+    });
+
+    res.status(201).json(newVoice);
+  });
+
+  app.patch('/api/custom-voices/:id', (req, res) => {
+    const tenantId = (req as any).tenantId;
+    const voice = db.getCustomVoice(req.params.id);
+    if (!voice || voice.tenantId !== tenantId) return res.status(404).json({ error: 'Voice not found' });
+
+    const updated = db.updateCustomVoice(req.params.id, req.body);
+    res.json(updated);
+  });
+
+  app.delete('/api/custom-voices/:id', (req, res) => {
+    const tenantId = (req as any).tenantId;
+    const voice = db.getCustomVoice(req.params.id);
+    if (!voice || voice.tenantId !== tenantId) return res.status(404).json({ error: 'Voice not found' });
+
+    db.deleteCustomVoice(req.params.id);
+    res.json({ success: true });
+  });
+
   app.get('/api/calls', (req, res) => {
     const tenantId = (req as any).tenantId;
     res.json(db.getCalls(tenantId));

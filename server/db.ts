@@ -20,7 +20,12 @@ import {
   BridgeDashboardState,
   Invoice,
   PaymentTransaction,
-  EmailDispatchLog
+  EmailDispatchLog,
+  CustomVoice,
+  AgentVoiceConfig,
+  DepartmentRole,
+  RbacAuditLog,
+  Department
 } from '../src/types/index.ts';
 
 class DatabaseStore {
@@ -37,7 +42,7 @@ class DatabaseStore {
   campaigns: Map<string, Campaign> = new Map();
   events: PlatformEvent[] = [];
 
-  // New Stores for Cloud API, Bridges, Invoices & Emails
+  // Stores for Cloud API, Bridges, Invoices, Emails & Custom Voices
   cloudApis: Map<string, CloudApiConfig> = new Map();
   agentBridges: Map<string, AgenticBridgeConfig> = new Map();
   bridgeMessages: Map<string, BridgeMessage[]> = new Map();
@@ -46,6 +51,9 @@ class DatabaseStore {
   invoices: Map<string, Invoice> = new Map();
   payments: Map<string, PaymentTransaction> = new Map();
   emails: Map<string, EmailDispatchLog> = new Map();
+  customVoices: Map<string, CustomVoice> = new Map();
+  departmentRoles: Map<string, DepartmentRole> = new Map();
+  rbacAuditLogs: RbacAuditLog[] = [];
 
   constructor() {
     this.seedInitialData();
@@ -183,16 +191,27 @@ class DatabaseStore {
       }
     });
 
-    // Seed Multi-Persona Users (Super Admin, Staff, Client)
+    // Seed Department Roles & Granular Permissions
+    this.seedDepartmentRoles(bhId);
+    this.seedDepartmentRoles(apexId);
+    this.seedDepartmentRoles(nexusId);
+
+    // Seed Multi-Persona Users with Department Assignments
     const u1: User = {
       id: 'usr_super_admin',
       tenantId: bhId,
       name: 'Alexander Ross',
       email: 'al4tb15@gmail.com',
       role: 'super_admin',
+      department: 'admin',
+      customRoleId: `role_admin_super_${bhId}`,
+      customRoleName: 'Workspace Administrator',
+      jobTitle: 'Managing Director & Founder',
       active: true,
+      mfaEnabled: true,
       lastLogin: new Date().toISOString(),
-      companyName: 'Business HUB Platform Owner'
+      companyName: 'Business HUB Platform Owner',
+      createdAt: '2026-01-10T00:00:00.000Z'
     };
     const u2: User = {
       id: 'usr_staff_sarah',
@@ -200,9 +219,15 @@ class DatabaseStore {
       name: 'Sarah Jenkins',
       email: 'sarah.jenkins@businesshub.app',
       role: 'staff',
+      department: 'sales',
+      customRoleId: `role_sales_closer_${bhId}`,
+      customRoleName: 'Senior Sales Closer',
+      jobTitle: 'Head of Enterprise Sales',
       active: true,
+      mfaEnabled: true,
       lastLogin: new Date().toISOString(),
-      companyName: 'Business HUB Revenue Team'
+      companyName: 'Business HUB Revenue Team',
+      createdAt: '2026-01-15T00:00:00.000Z'
     };
     const u3: User = {
       id: 'usr_staff_marcus',
@@ -210,9 +235,63 @@ class DatabaseStore {
       name: 'Marcus Vance',
       email: 'marcus@businesshub.app',
       role: 'sales_user',
+      department: 'marketing',
+      customRoleId: `role_mkt_director_${bhId}`,
+      customRoleName: 'Growth & Campaign Director',
+      jobTitle: 'Growth & Outreach Lead',
       active: true,
+      mfaEnabled: false,
       lastLogin: new Date().toISOString(),
-      companyName: 'Business HUB Outbound Squad'
+      companyName: 'Business HUB Outbound Squad',
+      createdAt: '2026-01-20T00:00:00.000Z'
+    };
+    const u4_sdr: User = {
+      id: 'usr_staff_liam',
+      tenantId: bhId,
+      name: 'Liam O\'Connor',
+      email: 'liam.oconnor@businesshub.app',
+      role: 'sales_user',
+      department: 'sales',
+      customRoleId: `role_sales_sdr_${bhId}`,
+      customRoleName: 'Sales Development Rep (SDR)',
+      jobTitle: 'Senior SDR Specialist',
+      active: true,
+      mfaEnabled: false,
+      lastLogin: new Date(Date.now() - 3600000 * 2).toISOString(),
+      companyName: 'Business HUB Outbound Squad',
+      createdAt: '2026-02-01T00:00:00.000Z'
+    };
+    const u5_ops: User = {
+      id: 'usr_staff_chloe',
+      tenantId: bhId,
+      name: 'Chloe Evans',
+      email: 'chloe.evans@businesshub.app',
+      role: 'manager',
+      department: 'operations',
+      customRoleId: `role_ops_compliance_${bhId}`,
+      customRoleName: 'Operations & Compliance Lead',
+      jobTitle: 'Compliance & Legal Analyst',
+      active: true,
+      mfaEnabled: true,
+      lastLogin: new Date(Date.now() - 3600000 * 5).toISOString(),
+      companyName: 'Business HUB Operations',
+      createdAt: '2026-02-05T00:00:00.000Z'
+    };
+    const u6_mkt: User = {
+      id: 'usr_staff_lucas',
+      tenantId: bhId,
+      name: 'Lucas Wright',
+      email: 'lucas.wright@businesshub.app',
+      role: 'staff',
+      department: 'marketing',
+      customRoleId: `role_mkt_content_${bhId}`,
+      customRoleName: 'Marketing Outreach Specialist',
+      jobTitle: 'Content & Campaign Creator',
+      active: true,
+      mfaEnabled: false,
+      lastLogin: new Date(Date.now() - 86400000).toISOString(),
+      companyName: 'Business HUB Outbound Squad',
+      createdAt: '2026-02-10T00:00:00.000Z'
     };
     const u4: User = {
       id: 'usr_client_james',
@@ -220,9 +299,15 @@ class DatabaseStore {
       name: 'James Thornton (Client)',
       email: 'james.thornton@apexlegal.com.au',
       role: 'client',
+      department: 'executive',
+      customRoleId: `role_admin_super_${apexId}`,
+      customRoleName: 'Workspace Administrator',
+      jobTitle: 'Managing Partner',
       active: true,
+      mfaEnabled: true,
       lastLogin: new Date().toISOString(),
-      companyName: 'Apex Legal Client Portal'
+      companyName: 'Apex Legal Client Portal',
+      createdAt: '2026-01-12T00:00:00.000Z'
     };
     const u5: User = {
       id: 'usr_client_claire',
@@ -230,14 +315,23 @@ class DatabaseStore {
       name: 'Claire Sterling (Client)',
       email: 'claire@nexusadvisory.com.au',
       role: 'client',
+      department: 'executive',
+      customRoleId: `role_admin_super_${nexusId}`,
+      customRoleName: 'Workspace Administrator',
+      jobTitle: 'Principal Consultant',
       active: true,
+      mfaEnabled: true,
       lastLogin: new Date().toISOString(),
-      companyName: 'Nexus Commercial Portal'
+      companyName: 'Nexus Commercial Portal',
+      createdAt: '2026-01-14T00:00:00.000Z'
     };
 
     this.users.set(u1.id, u1);
     this.users.set(u2.id, u2);
     this.users.set(u3.id, u3);
+    this.users.set(u4_sdr.id, u4_sdr);
+    this.users.set(u5_ops.id, u5_ops);
+    this.users.set(u6_mkt.id, u6_mkt);
     this.users.set(u4.id, u4);
     this.users.set(u5.id, u5);
 
@@ -268,6 +362,115 @@ class DatabaseStore {
     // Seed Invoices, Payment Transactions, and Email Logs
     this.seedBillingAndEmailData(bhId);
     this.seedBillingAndEmailData(apexId);
+
+    // Seed Custom Voices (Cloned, Recorded & Neural Voice Presets)
+    this.seedCustomVoices(bhId);
+    this.seedCustomVoices(apexId);
+    this.seedCustomVoices(nexusId);
+  }
+
+  seedCustomVoices(tenantId: string) {
+    const defaultVoices: CustomVoice[] = [
+      {
+        id: `voice_cloned_alex_${tenantId}`,
+        tenantId,
+        name: 'Alexander Sterling (Founder Voice Clone)',
+        description: 'Authentic cloned voice of Alexander. Confident, warm Australian executive pacing with high clarity.',
+        gender: 'male',
+        accent: 'en-AU (Sydney Executive)',
+        language: 'English (Australian)',
+        provider: 'custom_recorded',
+        isRecordedByMe: true,
+        audioDurationSeconds: 42,
+        sampleAudioUrl: 'data:audio/wav;base64,placeholder_voice_sample',
+        sampleScript: 'Hi there! This is Alexander from Business HUB. I noticed your team is scaling up revenue operations across Australia and wanted to share how our autonomous agentic workflows can streamline your outreach.',
+        settings: {
+          speed: 1.05,
+          pitch: 1.0,
+          stability: 88,
+          similarityBoost: 94,
+          styleExaggeration: 15,
+          noiseReduction: true
+        },
+        labels: ['Founder Clone', 'Executive', 'High Trust', 'B2B Sales'],
+        createdAt: new Date(Date.now() - 86400000 * 14).toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: `voice_charlotte_${tenantId}`,
+        tenantId,
+        name: 'Charlotte Vance (Senior Closer)',
+        description: 'Charismatic Australian professional female voice. Empathetic objection handling and crisp articulation.',
+        gender: 'female',
+        accent: 'en-AU (Melbourne Professional)',
+        language: 'English (Australian)',
+        provider: 'gemini_neural',
+        isRecordedByMe: false,
+        audioDurationSeconds: 30,
+        sampleScript: 'Good morning! Charlotte here from the partnerships desk. We help legal and commercial firms save up to twenty hours a week on client qualification.',
+        settings: {
+          speed: 1.02,
+          pitch: 1.02,
+          stability: 85,
+          similarityBoost: 90,
+          styleExaggeration: 20,
+          noiseReduction: true
+        },
+        labels: ['Consultative', 'Fast Paced', 'Inbound & Outbound'],
+        createdAt: new Date(Date.now() - 86400000 * 20).toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: `voice_liam_${tenantId}`,
+        tenantId,
+        name: 'Liam O\'Connor (Technical Solutions)',
+        description: 'Deep, calm Irish-Australian engineer tone. Ideal for deep-dive technical architecture and API walk-throughs.',
+        gender: 'male',
+        accent: 'en-IE / en-AU (Technical Neutral)',
+        language: 'English (UK/AU)',
+        provider: 'elevenlabs_clone',
+        isRecordedByMe: false,
+        audioDurationSeconds: 35,
+        sampleScript: 'Hey there. I am Liam. I can walk you through our LangGraph integration and multi-agent latency benchmarks whenever you are ready.',
+        settings: {
+          speed: 0.98,
+          pitch: 0.95,
+          stability: 92,
+          similarityBoost: 88,
+          styleExaggeration: 10,
+          noiseReduction: true
+        },
+        labels: ['Technical', 'Calm', 'Authoritative'],
+        createdAt: new Date(Date.now() - 86400000 * 10).toISOString(),
+        updatedAt: new Date().toISOString()
+      },
+      {
+        id: `voice_priya_${tenantId}`,
+        tenantId,
+        name: 'Priya Sharma (Client Success & Concierge)',
+        description: 'Polite, crystal clear APAC international accent with friendly, supportive energy for customer success.',
+        gender: 'female',
+        accent: 'en-SG / en-IN (Global Business Neutral)',
+        language: 'English (International)',
+        provider: 'webrtc_edge',
+        isRecordedByMe: false,
+        audioDurationSeconds: 28,
+        sampleScript: 'Hello! I am Priya with Client Success. How can I assist you with your onboarding dashboard today?',
+        settings: {
+          speed: 1.0,
+          pitch: 1.05,
+          stability: 80,
+          similarityBoost: 85,
+          styleExaggeration: 25,
+          noiseReduction: true
+        },
+        labels: ['Support', 'Onboarding', 'APAC Friendly'],
+        createdAt: new Date(Date.now() - 86400000 * 7).toISOString(),
+        updatedAt: new Date().toISOString()
+      }
+    ];
+
+    defaultVoices.forEach(v => this.customVoices.set(v.id, v));
   }
 
   seedCloudApis(tenantId: string) {
@@ -761,6 +964,18 @@ class DatabaseStore {
         promptInstruction: 'Analyze real-time events, evaluate lead scoring thresholds, and orchestrate outreach tasks across voice, email, and chat.',
         model: 'gemini-2.5-flash',
         cloudProvider: 'google_gemini',
+        voiceConfig: {
+          voiceId: `voice_cloned_alex_${tenantId}`,
+          voiceName: 'Alexander Sterling (Founder Voice Clone)',
+          provider: 'custom_recorded',
+          gender: 'male',
+          accent: 'en-AU (Sydney Executive)',
+          speed: 1.05,
+          pitch: 1.0,
+          stability: 88,
+          similarityBoost: 94,
+          greetingScript: 'Hello, this is Alexander Sterling following up on your revenue modernization inquiry.'
+        },
         allowedChannels: ['email', 'sms', 'chat', 'voice'],
         qualificationRules: ['Require Australian corporate domain', 'Annual revenue > $2M', 'Clear business decision maker identified'],
         objectionHandlingRules: [
@@ -783,6 +998,18 @@ class DatabaseStore {
         promptInstruction: 'Introduce yourself from Business HUB, ask diagnostic questions regarding current revenue workflows, handle objections respectfully, and secure a calendar appointment.',
         model: 'gemini-2.5-flash',
         cloudProvider: 'google_gemini',
+        voiceConfig: {
+          voiceId: `voice_charlotte_${tenantId}`,
+          voiceName: 'Charlotte Vance (Senior Closer)',
+          provider: 'gemini_neural',
+          gender: 'female',
+          accent: 'en-AU (Melbourne Professional)',
+          speed: 1.02,
+          pitch: 1.02,
+          stability: 85,
+          similarityBoost: 90,
+          greetingScript: 'Good day! Charlotte here calling from Business HUB. Do you have two quick minutes to discuss your lead pipeline?'
+        },
         allowedChannels: ['voice'],
         qualificationRules: ['Must verify key decision maker name and email', 'Must verify active sales team size'],
         objectionHandlingRules: [
@@ -806,6 +1033,18 @@ class DatabaseStore {
         model: 'Hermes-3-Llama-3.1-405B',
         cloudProvider: 'hermes_agent',
         bridgeId: `bridge_hermes_${tenantId}`,
+        voiceConfig: {
+          voiceId: `voice_liam_${tenantId}`,
+          voiceName: 'Liam O\'Connor (Technical Solutions)',
+          provider: 'elevenlabs_clone',
+          gender: 'male',
+          accent: 'en-IE / en-AU (Technical Neutral)',
+          speed: 0.98,
+          pitch: 0.95,
+          stability: 92,
+          similarityBoost: 88,
+          greetingScript: 'Greetings. Liam here with the technical architecture and compliance review.'
+        },
         allowedChannels: ['email', 'chat'],
         qualificationRules: ['Verified website security headers', 'Active hiring for revenue/ops roles'],
         objectionHandlingRules: [],
@@ -1213,6 +1452,335 @@ Setup Fees: Standard onboarding fee is $1,500 AUD which includes custom prompt c
 
   getEmails(tenantId: string): EmailDispatchLog[] {
     return Array.from(this.emails.values()).filter(e => e.tenantId === tenantId);
+  }
+
+  // Custom Voices methods
+  getCustomVoices(tenantId: string): CustomVoice[] {
+    // Return tenant-specific voices or global presets
+    const list = Array.from(this.customVoices.values()).filter(v => v.tenantId === tenantId);
+    if (list.length === 0) {
+      this.seedCustomVoices(tenantId);
+      return Array.from(this.customVoices.values()).filter(v => v.tenantId === tenantId);
+    }
+    return list;
+  }
+
+  getCustomVoice(id: string): CustomVoice | undefined {
+    return this.customVoices.get(id);
+  }
+
+  createCustomVoice(voice: CustomVoice): CustomVoice {
+    this.customVoices.set(voice.id, voice);
+    return voice;
+  }
+
+  updateCustomVoice(id: string, updates: Partial<CustomVoice>): CustomVoice | undefined {
+    const existing = this.customVoices.get(id);
+    if (!existing) return undefined;
+    const updated: CustomVoice = {
+      ...existing,
+      ...updates,
+      updatedAt: new Date().toISOString()
+    };
+    this.customVoices.set(id, updated);
+    return updated;
+  }
+
+  deleteCustomVoice(id: string): boolean {
+    return this.customVoices.delete(id);
+  }
+
+  // ==========================================
+  // RBAC & Department Role Methods
+  // ==========================================
+  seedDepartmentRoles(tenantId: string) {
+    const defaultRoles: DepartmentRole[] = [
+      {
+        id: `role_admin_super_${tenantId}`,
+        tenantId,
+        name: 'Workspace Administrator',
+        department: 'admin',
+        description: 'Unrestricted administrative control across all CRM modules, AI agents, billing, and compliance policies.',
+        isSystemDefault: true,
+        color: '#6366f1',
+        permissions: ['*'],
+        assignedUsersCount: 1,
+        createdAt: '2026-01-10T00:00:00.000Z',
+        updatedAt: '2026-01-10T00:00:00.000Z'
+      },
+      {
+        id: `role_sales_closer_${tenantId}`,
+        tenantId,
+        name: 'Senior Sales Closer',
+        department: 'sales',
+        description: 'Full access to lead records, outbound autonomous calling, real-time audio listen, and appointment scheduling.',
+        isSystemDefault: true,
+        color: '#10b981',
+        permissions: [
+          'leads:view',
+          'leads:create',
+          'leads:enrich',
+          'leads:edit',
+          'voice:initiate_call',
+          'voice:listen_audio',
+          'communications:view',
+          'communications:send_email',
+          'communications:send_sms',
+          'calendar:view',
+          'calendar:book',
+          'calendar:reschedule',
+          'campaigns:view',
+          'knowledge:view',
+          'analytics:view'
+        ],
+        assignedUsersCount: 1,
+        createdAt: '2026-01-12T00:00:00.000Z',
+        updatedAt: '2026-01-12T00:00:00.000Z'
+      },
+      {
+        id: `role_sales_sdr_${tenantId}`,
+        tenantId,
+        name: 'Sales Development Rep (SDR)',
+        department: 'sales',
+        description: 'Outbound prospect qualification, discovery calling, personalized emails, and booking demonstration slots.',
+        isSystemDefault: true,
+        color: '#3b82f6',
+        permissions: [
+          'leads:view',
+          'leads:create',
+          'leads:enrich',
+          'voice:initiate_call',
+          'communications:view',
+          'communications:send_email',
+          'calendar:view',
+          'calendar:book',
+          'knowledge:view'
+        ],
+        assignedUsersCount: 1,
+        createdAt: '2026-01-15T00:00:00.000Z',
+        updatedAt: '2026-01-15T00:00:00.000Z'
+      },
+      {
+        id: `role_mkt_director_${tenantId}`,
+        tenantId,
+        name: 'Growth & Campaign Director',
+        department: 'marketing',
+        description: 'Manages multi-channel outreach campaigns, lead scraping, voice studio cloning, and conversion analytics.',
+        isSystemDefault: true,
+        color: '#ec4899',
+        permissions: [
+          'campaigns:view',
+          'campaigns:create',
+          'campaigns:launch',
+          'campaigns:analytics',
+          'leads:view',
+          'leads:create',
+          'leads:enrich',
+          'leads:export',
+          'voice_studio:view',
+          'voice_studio:record_clone',
+          'voice_studio:tune_neural',
+          'voice_studio:assign_agent',
+          'communications:view',
+          'communications:send_email',
+          'communications:manage_templates',
+          'knowledge:view',
+          'knowledge:upload',
+          'analytics:view'
+        ],
+        assignedUsersCount: 1,
+        createdAt: '2026-01-18T00:00:00.000Z',
+        updatedAt: '2026-01-18T00:00:00.000Z'
+      },
+      {
+        id: `role_mkt_content_${tenantId}`,
+        tenantId,
+        name: 'Marketing Outreach Specialist',
+        department: 'marketing',
+        description: 'Crafts email/SMS sequence templates, enriches RAG company knowledge, and reviews campaign performance.',
+        isSystemDefault: true,
+        color: '#f59e0b',
+        permissions: [
+          'campaigns:view',
+          'campaigns:create',
+          'leads:view',
+          'voice_studio:view',
+          'communications:view',
+          'communications:send_email',
+          'communications:manage_templates',
+          'knowledge:view',
+          'knowledge:upload'
+        ],
+        assignedUsersCount: 1,
+        createdAt: '2026-01-20T00:00:00.000Z',
+        updatedAt: '2026-01-20T00:00:00.000Z'
+      },
+      {
+        id: `role_ops_compliance_${tenantId}`,
+        tenantId,
+        name: 'Operations & Compliance Lead',
+        department: 'operations',
+        description: 'Enforces Australian telecommunications compliance, DNCR verification, team activity, and client support.',
+        isSystemDefault: true,
+        color: '#06b6d4',
+        permissions: [
+          'settings:view',
+          'settings:manage_compliance',
+          'leads:view',
+          'leads:edit',
+          'voice:listen_audio',
+          'voice:export_recordings',
+          'communications:view',
+          'calendar:view',
+          'calendar:reschedule',
+          'knowledge:view',
+          'billing:view'
+        ],
+        assignedUsersCount: 1,
+        createdAt: '2026-01-22T00:00:00.000Z',
+        updatedAt: '2026-01-22T00:00:00.000Z'
+      },
+      {
+        id: `role_exec_viewer_${tenantId}`,
+        tenantId,
+        name: 'Executive Board Observer',
+        department: 'executive',
+        description: 'Read-only business intelligence access to high-level pipeline conversions, financials, and team telemetry.',
+        isSystemDefault: true,
+        color: '#8b5cf6',
+        permissions: [
+          'leads:view',
+          'campaigns:view',
+          'campaigns:analytics',
+          'calendar:view',
+          'billing:view',
+          'analytics:view'
+        ],
+        assignedUsersCount: 0,
+        createdAt: '2026-01-25T00:00:00.000Z',
+        updatedAt: '2026-01-25T00:00:00.000Z'
+      }
+    ];
+
+    defaultRoles.forEach(r => this.departmentRoles.set(r.id, r));
+
+    // Seed initial Audit Logs for this tenant
+    this.rbacAuditLogs.push(
+      {
+        id: `audit_1_${tenantId}`,
+        tenantId,
+        actorId: 'usr_super_admin',
+        actorName: 'Alexander Ross',
+        action: 'create_role',
+        targetType: 'role',
+        targetName: 'Senior Sales Closer',
+        details: 'Initialized predefined department role with 15 granular CRM, Voice, and Calendar permissions.',
+        timestamp: new Date(Date.now() - 86400000 * 3).toISOString()
+      },
+      {
+        id: `audit_2_${tenantId}`,
+        tenantId,
+        actorId: 'usr_super_admin',
+        actorName: 'Alexander Ross',
+        action: 'assign_role',
+        targetType: 'user',
+        targetName: 'Sarah Jenkins',
+        details: 'Assigned to Department: Sales with role Senior Sales Closer and MFA requirement enforced.',
+        timestamp: new Date(Date.now() - 86400000 * 2).toISOString()
+      },
+      {
+        id: `audit_3_${tenantId}`,
+        tenantId,
+        actorId: 'usr_super_admin',
+        actorName: 'Alexander Ross',
+        action: 'update_permissions',
+        targetType: 'policy',
+        targetName: 'Australian DNCR Real-Time Verification',
+        details: 'Bound mandatory Do Not Call Register suppression check to all outbound Sales voice actions.',
+        timestamp: new Date(Date.now() - 86400000).toISOString()
+      }
+    );
+  }
+
+  getDepartmentRoles(tenantId: string): DepartmentRole[] {
+    let roles = Array.from(this.departmentRoles.values()).filter(r => r.tenantId === tenantId);
+    if (roles.length === 0) {
+      this.seedDepartmentRoles(tenantId);
+      roles = Array.from(this.departmentRoles.values()).filter(r => r.tenantId === tenantId);
+    }
+    
+    // Update assigned user counts dynamically
+    const tenantUsers = this.getUsers(tenantId);
+    return roles.map(r => ({
+      ...r,
+      assignedUsersCount: tenantUsers.filter(u => u.customRoleId === r.id).length
+    }));
+  }
+
+  getDepartmentRole(id: string): DepartmentRole | undefined {
+    return this.departmentRoles.get(id);
+  }
+
+  createDepartmentRole(role: DepartmentRole): DepartmentRole {
+    this.departmentRoles.set(role.id, role);
+    return role;
+  }
+
+  updateDepartmentRole(id: string, updates: Partial<DepartmentRole>): DepartmentRole | undefined {
+    const existing = this.departmentRoles.get(id);
+    if (!existing) return undefined;
+    const updated: DepartmentRole = {
+      ...existing,
+      ...updates,
+      updatedAt: new Date().toISOString()
+    };
+    this.departmentRoles.set(id, updated);
+    return updated;
+  }
+
+  deleteDepartmentRole(id: string): boolean {
+    const existing = this.departmentRoles.get(id);
+    if (!existing || existing.isSystemDefault) return false;
+    return this.departmentRoles.delete(id);
+  }
+
+  getUsers(tenantId: string): User[] {
+    return Array.from(this.users.values()).filter(u => u.tenantId === tenantId || u.role === 'super_admin');
+  }
+
+  getUser(id: string): User | undefined {
+    return this.users.get(id);
+  }
+
+  createUser(user: User): User {
+    this.users.set(user.id, user);
+    return user;
+  }
+
+  updateUser(id: string, updates: Partial<User>): User | undefined {
+    const existing = this.users.get(id);
+    if (!existing) return undefined;
+    const updated: User = {
+      ...existing,
+      ...updates
+    };
+    this.users.set(id, updated);
+    return updated;
+  }
+
+  deleteUser(id: string): boolean {
+    return this.users.delete(id);
+  }
+
+  getRbacAuditLogs(tenantId: string): RbacAuditLog[] {
+    return this.rbacAuditLogs.filter(l => l.tenantId === tenantId).sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime());
+  }
+
+  addRbacAuditLog(log: RbacAuditLog): void {
+    this.rbacAuditLogs.unshift(log);
+    if (this.rbacAuditLogs.length > 500) {
+      this.rbacAuditLogs = this.rbacAuditLogs.slice(0, 500);
+    }
   }
 }
 

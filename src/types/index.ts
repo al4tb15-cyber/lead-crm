@@ -92,17 +92,69 @@ export interface Tenant {
   };
 }
 
+export type Department = 'sales' | 'marketing' | 'admin' | 'operations' | 'support' | 'executive';
+
 export interface User {
   id: string;
   tenantId: string;
   name: string;
   email: string;
   role: UserRole;
+  department?: Department;
+  customRoleId?: string;
+  customRoleName?: string;
+  jobTitle?: string;
   avatarUrl?: string;
   phone?: string;
   active: boolean;
+  mfaEnabled?: boolean;
+  customPermissions?: string[];
   lastLogin?: string;
   companyName?: string;
+  createdAt?: string;
+}
+
+export interface DepartmentRole {
+  id: string;
+  tenantId: string;
+  name: string;
+  department: Department;
+  description: string;
+  isSystemDefault?: boolean;
+  color: string;
+  permissions: string[];
+  assignedUsersCount?: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PermissionDefinition {
+  key: string;
+  label: string;
+  description: string;
+  category: 'read' | 'write' | 'delete' | 'admin';
+  isHighRisk?: boolean;
+}
+
+export interface PermissionModule {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  departmentScope: Department[];
+  permissions: PermissionDefinition[];
+}
+
+export interface RbacAuditLog {
+  id: string;
+  tenantId: string;
+  actorId: string;
+  actorName: string;
+  action: 'create_role' | 'update_role' | 'delete_role' | 'assign_role' | 'update_permissions' | 'user_invited' | 'user_status_changed';
+  targetType: 'role' | 'user' | 'policy';
+  targetName: string;
+  details: string;
+  timestamp: string;
 }
 
 export interface Company {
@@ -293,6 +345,46 @@ export interface AgenticBridgeConfig {
   systemPromptPreset?: string;
 }
 
+export interface CustomVoice {
+  id: string;
+  tenantId: string;
+  name: string;
+  description: string;
+  gender: 'male' | 'female' | 'neutral';
+  accent: string;
+  language: string;
+  provider: 'gemini_neural' | 'elevenlabs_clone' | 'webrtc_edge' | 'custom_recorded';
+  sampleAudioUrl?: string;
+  audioDurationSeconds?: number;
+  isRecordedByMe: boolean;
+  sampleScript?: string;
+  settings: {
+    speed: number; // 0.5 to 1.5 (default 1.0)
+    pitch: number; // 0.5 to 1.5 (default 1.0)
+    stability: number; // 0 to 100
+    similarityBoost: number; // 0 to 100
+    styleExaggeration: number; // 0 to 100
+    noiseReduction: boolean;
+  };
+  labels?: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AgentVoiceConfig {
+  voiceId: string; // custom voice id or built-in voice id
+  voiceName: string;
+  provider: 'gemini_neural' | 'elevenlabs_clone' | 'webrtc_edge' | 'custom_recorded';
+  gender: 'male' | 'female' | 'neutral';
+  accent: string;
+  speed: number;
+  pitch: number;
+  stability: number;
+  similarityBoost: number;
+  greetingScript?: string;
+  audioPreviewUrl?: string;
+}
+
 export interface AgentConfig {
   id: string;
   tenantId: string;
@@ -306,6 +398,7 @@ export interface AgentConfig {
   model: string;
   cloudProvider?: CloudAiProvider;
   bridgeId?: string;
+  voiceConfig?: AgentVoiceConfig;
   allowedChannels: ChannelType[];
   qualificationRules: string[];
   objectionHandlingRules: { objection: string; counterStrategy: string }[];

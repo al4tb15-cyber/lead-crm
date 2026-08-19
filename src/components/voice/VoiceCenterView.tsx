@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTenant } from '../../context/TenantContext.tsx';
 import { api } from '../../api/client.ts';
-import { Lead, CallLog } from '../../types/index.ts';
+import { Lead, CallLog, AgentConfig, CustomVoice } from '../../types/index.ts';
 import {
   PhoneCall,
   PhoneOff,
@@ -20,17 +20,23 @@ import {
   AlertTriangle,
   FileText,
   TrendingUp,
-  RotateCcw
+  RotateCcw,
+  Sliders,
+  AudioLines
 } from 'lucide-react';
 
 interface VoiceCenterViewProps {
   initialLead?: Lead | null;
+  onNavigateToVoiceStudio?: () => void;
 }
 
-export const VoiceCenterView: React.FC<VoiceCenterViewProps> = ({ initialLead }) => {
+export const VoiceCenterView: React.FC<VoiceCenterViewProps> = ({ initialLead, onNavigateToVoiceStudio }) => {
   const { activeTenant, addToast } = useTenant();
   const [leads, setLeads] = useState<Lead[]>([]);
   const [callLogs, setCallLogs] = useState<CallLog[]>([]);
+  const [agents, setAgents] = useState<AgentConfig[]>([]);
+  const [customVoices, setCustomVoices] = useState<CustomVoice[]>([]);
+  const [selectedAgentId, setSelectedAgentId] = useState<string>('');
   const [selectedLeadId, setSelectedLeadId] = useState<string>(initialLead?.id || '');
   
   // Active Call State
@@ -80,27 +86,54 @@ export const VoiceCenterView: React.FC<VoiceCenterViewProps> = ({ initialLead })
   const loadData = async () => {
     if (!activeTenant) return;
     try {
-      const [l, c] = await Promise.all([api.getLeads(), api.getCalls()]);
+      const [l, c, a, v] = await Promise.all([
+        api.getLeads(),
+        api.getCalls(),
+        api.getAgents(),
+        api.getCustomVoices()
+      ]);
       setLeads(l);
       setCallLogs(c);
+      setAgents(a);
+      setCustomVoices(v);
       if (!selectedLeadId && l.length > 0) {
         setSelectedLeadId(l[0].id);
+      }
+      if (a.length > 0 && !selectedAgentId) {
+        // Default to voice/sales agent
+        const phoneAgent = a.find(ag => ag.type === 'voice' || ag.type === 'sales') || a[0];
+        setSelectedAgentId(phoneAgent.id);
       }
     } catch (e) {
       console.error(e);
     }
   };
 
+  const selectedAgent = agents.find(a => a.id === selectedAgentId) || agents[0];
+  const activeLead = leads.find(l => l.id === selectedLeadId) || leads[0];
+
   const speakText = (text: string) => {
     if (!audioTtsEnabled || typeof window === 'undefined' || !('speechSynthesis' in window)) return;
     window.speechSynthesis.cancel();
     const utterance = new SpeechSynthesisUtterance(text);
-    utterance.rate = 1.05;
-    utterance.pitch = 1.0;
     
-    // Select Australian or natural English voice if present
+    // Apply selected agent's custom voice tuning
+    const voiceCfg = selectedAgent?.voiceConfig;
+    utterance.rate = voiceCfg?.speed || 1.05;
+    utterance.pitch = voiceCfg?.pitch || 1.0;
+    
+    // Select best matching voice from system
     const voices = window.speechSynthesis.getVoices();
-    const auVoice = voices.find(v => v.lang === 'en-AU' || v.lang.includes('AU')) || voices[0];
+    const isFemale = voiceCfg?.gender === 'female';
+    const isMale = voiceCfg?.gender === 'male';
+
+    const auVoice = voices.find(v => {
+      const matchLang = v.lang.toLowerCase().includes('en-au') || v.lang.toLowerCase().includes('en');
+      if (isFemale) return matchLang && (v.name.toLowerCase().includes('female') || v.name.toLowerCase().includes('karen') || v.name.toLowerCase().includes('samantha') || v.name.toLowerCase().includes('catherine'));
+      if (isMale) return matchLang && (v.name.toLowerCase().includes('male') || v.name.toLowerCase().includes('david') || v.name.toLowerCase().includes('alex'));
+      return matchLang;
+    }) || voices.find(v => v.lang === 'en-AU' || v.lang.includes('AU')) || voices[0];
+
     if (auVoice) utterance.voice = auVoice;
 
     window.speechSynthesis.speak(utterance);
@@ -234,10 +267,8 @@ export const VoiceCenterView: React.FC<VoiceCenterViewProps> = ({ initialLead })
     return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
   };
 
-  const activeLead = leads.find(l => l.id === selectedLeadId);
-
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-6 space-y-6 max-w-7xl mx-auto animate-fadeIn">
       {/* Header */}
       <div className="bg-slate-900 border border-slate-800 p-6 rounded-2xl shadow-xl flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
         <div>
@@ -255,6 +286,16 @@ export const VoiceCenterView: React.FC<VoiceCenterViewProps> = ({ initialLead })
         </div>
 
         <div className="flex items-center gap-2">
+          {onNavigateToVoiceStudio && (
+            <button
+              onClick={onNavigateToVoiceStudio}
+              className="flex items-center gap-1.5 px-3.5 py-1.5 rounded-xl bg-gradient-to-r from-rose-500 to-indigo-600 hover:from-rose-600 hover:to-indigo-700 text-white text-xs font-bold shadow-md shadow-rose-500/20 transition-all hover:scale-105 cursor-pointer"
+            >
+              <Mic className="w-3.5 h-3.5" />
+              <span>Voice Studio & Clones</span>
+            </button>
+          )}
+
           <button
             onClick={() => setAudioTtsEnabled(!audioTtsEnabled)}
             className={`flex items-center gap-1.5 px-3 py-1.5 rounded-xl border text-xs font-semibold transition-colors ${
@@ -273,6 +314,50 @@ export const VoiceCenterView: React.FC<VoiceCenterViewProps> = ({ initialLead })
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Left Column (7 cols): Active Voice Console */}
         <div className="lg:col-span-7 bg-slate-900 border border-slate-800 rounded-2xl p-6 shadow-xl flex flex-col justify-between space-y-6">
+          
+          {/* Active Calling Agent & Custom Voice Banner */}
+          <div className="bg-gradient-to-r from-indigo-950/40 via-purple-950/30 to-slate-950 border border-indigo-500/30 p-4 rounded-xl space-y-2.5">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Bot className="w-4 h-4 text-indigo-400" />
+                <span className="text-xs font-bold uppercase tracking-wider text-slate-200">
+                  Calling Agent & Assigned Voice Profile
+                </span>
+              </div>
+              <span className="text-[10px] font-mono px-2 py-0.5 rounded bg-indigo-500/20 text-indigo-300 font-bold">
+                Speed: {selectedAgent?.voiceConfig?.speed || 1.05}x • Pitch: {selectedAgent?.voiceConfig?.pitch || 1.0}x
+              </span>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 block mb-1">Active AI Agent</label>
+                <select
+                  disabled={isCallActive}
+                  value={selectedAgentId}
+                  onChange={e => setSelectedAgentId(e.target.value)}
+                  className="w-full bg-slate-900 border border-slate-700 rounded-lg px-2.5 py-1.5 text-xs text-slate-200 font-medium focus:outline-none focus:border-indigo-500 disabled:opacity-50"
+                >
+                  {agents.map(ag => (
+                    <option key={ag.id} value={ag.id}>
+                      {ag.name} ({ag.type})
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[10px] font-semibold text-slate-400 block mb-1">Assigned Voice Model</label>
+                <div className="w-full bg-slate-900/80 border border-indigo-500/20 rounded-lg px-2.5 py-1.5 text-xs text-indigo-300 font-medium flex items-center justify-between">
+                  <span className="truncate">{selectedAgent?.voiceConfig?.voiceName || 'Alexander Sterling'}</span>
+                  <span className="text-[9px] uppercase px-1.5 py-0.5 rounded bg-indigo-500/30 text-indigo-200 font-bold ml-1 shrink-0">
+                    {selectedAgent?.voiceConfig?.accent || 'en-AU'}
+                  </span>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Target Lead Selector & Call Launcher */}
           <div className="space-y-3">
             <div className="flex items-center justify-between">

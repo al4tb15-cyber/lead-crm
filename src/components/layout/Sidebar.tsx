@@ -19,7 +19,8 @@ import {
   ShieldCheck,
   Building2,
   DollarSign,
-  ExternalLink
+  ExternalLink,
+  Mic
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -55,6 +56,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'discovery', label: 'Lead Discovery & Scraping', icon: Search, badge: 'AI', badgeColor: 'bg-indigo-500/20 text-indigo-300' },
     { id: 'inbox', label: 'Omnichannel Inbox', icon: Inbox, badge: unreadCount > 0 ? unreadCount : null, badgeColor: 'bg-emerald-500/20 text-emerald-300' },
     { id: 'voice', label: 'AI Voice Station', icon: PhoneCall, badge: 'Live', badgeColor: 'bg-rose-500/20 text-rose-300' },
+    { id: 'voice_studio', label: 'Custom Voice Studio', icon: Mic, badge: 'Clone', badgeColor: 'bg-gradient-to-r from-rose-500 to-indigo-500 text-white' },
     { id: 'calendar', label: 'Calendar & Bookings', icon: Calendar, badge: appointmentsCount > 0 ? appointmentsCount : null }
   ];
 

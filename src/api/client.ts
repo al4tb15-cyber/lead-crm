@@ -19,7 +19,10 @@ import {
   BridgeDashboardState,
   Invoice,
   PaymentTransaction,
-  EmailDispatchLog
+  EmailDispatchLog,
+  CustomVoice,
+  DepartmentRole,
+  RbacAuditLog
 } from '../types/index.ts';
 
 export class ApiClient {
@@ -102,6 +105,51 @@ export class ApiClient {
 
   async getUsers(): Promise<User[]> {
     return this.request<User[]>('/api/users');
+  }
+
+  // RBAC & Department Roles
+  async getDepartmentRoles(): Promise<DepartmentRole[]> {
+    return this.request<DepartmentRole[]>('/api/rbac/roles');
+  }
+
+  async createDepartmentRole(data: Partial<DepartmentRole>): Promise<DepartmentRole> {
+    return this.request<DepartmentRole>('/api/rbac/roles', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async updateDepartmentRole(id: string, data: Partial<DepartmentRole>): Promise<DepartmentRole> {
+    return this.request<DepartmentRole>(`/api/rbac/roles/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async deleteDepartmentRole(id: string): Promise<{ success: boolean }> {
+    return this.request(`/api/rbac/roles/${id}`, { method: 'DELETE' });
+  }
+
+  async getRbacAuditLogs(): Promise<RbacAuditLog[]> {
+    return this.request<RbacAuditLog[]>('/api/rbac/audit-logs');
+  }
+
+  async createRbacUser(data: Partial<User>): Promise<User> {
+    return this.request<User>('/api/rbac/users', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async updateRbacUser(id: string, data: Partial<User>): Promise<User> {
+    return this.request<User>(`/api/rbac/users/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async deleteRbacUser(id: string): Promise<{ success: boolean }> {
+    return this.request(`/api/rbac/users/${id}`, { method: 'DELETE' });
   }
 
   // Cloud APIs
@@ -305,9 +353,33 @@ export class ApiClient {
     });
   }
 
-  // Calls
+  // Calls & Custom Voices
   async getCalls(): Promise<CallLog[]> {
     return this.request<CallLog[]>('/api/calls');
+  }
+
+  async getCustomVoices(): Promise<CustomVoice[]> {
+    return this.request<CustomVoice[]>('/api/custom-voices');
+  }
+
+  async createCustomVoice(data: Partial<CustomVoice>): Promise<CustomVoice> {
+    return this.request<CustomVoice>('/api/custom-voices', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async updateCustomVoice(id: string, data: Partial<CustomVoice>): Promise<CustomVoice> {
+    return this.request<CustomVoice>(`/api/custom-voices/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async deleteCustomVoice(id: string): Promise<{ success: boolean }> {
+    return this.request<{ success: boolean }>(`/api/custom-voices/${id}`, {
+      method: 'DELETE'
+    });
   }
 
   async runVoiceTurn(data: { utterance: string; leadId?: string; history: any[]; agentId?: string }): Promise<any> {
