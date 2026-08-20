@@ -651,3 +651,57 @@ export interface EmailDispatchLog {
   sentAt: string;
   metadata?: Record<string, any>;
 }
+
+// ==========================================
+// Production Legal Documents & Digital Signature Types
+// ==========================================
+export type LegalDocType = 
+  | 'msa_terms'
+  | 'privacy_policy_dpa'
+  | 'telecom_spam_dncr'
+  | 'voice_ai_disclosure'
+  | 'sla_security_addendum'
+  | 'custom_client_contract';
+
+export type SignatureStatus = 'draft' | 'pending_signature' | 'executed' | 'archived';
+
+export interface DigitalSignatureRecord {
+  id: string;
+  signatoryName: string;
+  signatoryEmail: string;
+  signatoryTitle: string;
+  signatoryCompany: string;
+  signatoryTaxIdOrAbn?: string;
+  signatureType: 'draw' | 'type' | 'crypto_certificate';
+  signatureDataUrl?: string;
+  signedAt: string;
+  ipAddress: string;
+  userAgent: string;
+  certificateHashSha256: string;
+  auditTrailId: string;
+}
+
+export interface LegalDocument {
+  id: string;
+  tenantId: string;
+  docType: LegalDocType;
+  title: string;
+  version: string;
+  effectiveDate: string;
+  governingLaw: string;
+  abnOrTaxId: string;
+  summary: string;
+  contentMarkdown: string;
+  status: SignatureStatus;
+  recipientName?: string;
+  recipientEmail?: string;
+  recipientCompany?: string;
+  signature?: DigitalSignatureRecord;
+  countersignature?: DigitalSignatureRecord;
+  deliveredAt?: string;
+  downloadUrl?: string;
+  tags: string[];
+  createdAt: string;
+  updatedAt: string;
+}
+

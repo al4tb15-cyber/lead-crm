@@ -22,7 +22,8 @@ import {
   EmailDispatchLog,
   CustomVoice,
   DepartmentRole,
-  RbacAuditLog
+  RbacAuditLog,
+  LegalDocument
 } from '../types/index.ts';
 
 export class ApiClient {
@@ -442,6 +443,59 @@ export class ApiClient {
     return this.request('/api/campaigns', {
       method: 'POST',
       body: JSON.stringify(data)
+    });
+  }
+
+  // Legal Documents & Digital Signing
+  async getLegalDocuments(): Promise<LegalDocument[]> {
+    return this.request<LegalDocument[]>('/api/legal/documents');
+  }
+
+  async getLegalDocument(id: string): Promise<LegalDocument> {
+    return this.request<LegalDocument>(`/api/legal/documents/${id}`);
+  }
+
+  async createLegalDocument(data: Partial<LegalDocument>): Promise<LegalDocument> {
+    return this.request<LegalDocument>('/api/legal/documents', {
+      method: 'POST',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async updateLegalDocument(id: string, data: Partial<LegalDocument>): Promise<LegalDocument> {
+    return this.request<LegalDocument>(`/api/legal/documents/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(data)
+    });
+  }
+
+  async deleteLegalDocument(id: string): Promise<{ success: boolean }> {
+    return this.request(`/api/legal/documents/${id}`, { method: 'DELETE' });
+  }
+
+  async signLegalDocument(id: string, signatureData: {
+    signatoryName: string;
+    signatoryEmail: string;
+    signatoryTitle?: string;
+    signatoryCompany?: string;
+    signatoryTaxIdOrAbn?: string;
+    signatureType?: 'draw' | 'type' | 'crypto_certificate';
+    signatureDataUrl?: string;
+  }): Promise<{ success: boolean; document: LegalDocument }> {
+    return this.request(`/api/legal/documents/${id}/sign`, {
+      method: 'POST',
+      body: JSON.stringify(signatureData)
+    });
+  }
+
+  async deliverLegalDocument(id: string, deliveryData: {
+    recipientEmail?: string;
+    recipientName?: string;
+    customMessage?: string;
+  }): Promise<{ success: boolean; deliveredAt: string; recipientEmail: string; dispatchLog: EmailDispatchLog; document: LegalDocument }> {
+    return this.request(`/api/legal/documents/${id}/deliver`, {
+      method: 'POST',
+      body: JSON.stringify(deliveryData)
     });
   }
 

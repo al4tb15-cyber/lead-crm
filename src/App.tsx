@@ -15,6 +15,7 @@ import { CampaignsView } from './components/campaigns/CampaignsView.tsx';
 import { AnalyticsView } from './components/analytics/AnalyticsView.tsx';
 import { PlatformAdminView } from './components/admin/PlatformAdminView.tsx';
 import { SettingsView } from './components/settings/SettingsView.tsx';
+import { LegalDocsView } from './components/legal/LegalDocsView.tsx';
 import { PaymentPipelineView } from './components/billing/PaymentPipelineView.tsx';
 import { CloudApiAndBridgeView } from './components/admin/CloudApiAndBridgeView.tsx';
 import { RemoteAgentWorkspaceView } from './components/bridges/RemoteAgentWorkspaceView.tsx';
@@ -137,6 +138,7 @@ const AppContent: React.FC = () => {
           {currentView === 'campaigns' && <CampaignsView />}
           {currentView === 'analytics' && <AnalyticsView />}
           {currentView === 'admin' && <PlatformAdminView />}
+          {currentView === 'legal_docs' && <div className="p-6 max-w-7xl mx-auto"><LegalDocsView /></div>}
           {currentView === 'settings' && <SettingsView />}
         </main>
       </div>

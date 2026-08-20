@@ -20,7 +20,8 @@ import {
   Building2,
   DollarSign,
   ExternalLink,
-  Mic
+  Mic,
+  FileCheck
 } from 'lucide-react';
 
 interface SidebarProps {
@@ -72,6 +73,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
   const adminItems = [
     { id: 'client_portal', label: 'Client Portal View', icon: ShieldCheck, badge: 'Live Portal', badgeColor: 'bg-cyan-500/20 text-cyan-300' },
     { id: 'admin', label: 'Platform Admin Center', icon: Server, badge: 'Super Admin', badgeColor: 'bg-purple-500/20 text-purple-300' },
+    { id: 'legal_docs', label: 'Legal Terms & E-Sign', icon: FileCheck, badge: 'E-Sign', badgeColor: 'bg-blue-500/20 text-blue-300' },
     { id: 'settings', label: 'White-Label & Settings', icon: Settings, badge: null }
   ];
 

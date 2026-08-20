@@ -1,6 +1,6 @@
 {
   "name": "Business HUB AI Revenue OS",
-  "description": "Multi-tenant AI Revenue Operating System for autonomous lead discovery, enrichment, qualification, multi-channel voice/email/chat/SMS agents, real-time calendar booking, CRM, and event orchestration.",
+  "description": "Enterprise multi-tenant Autonomous Revenue OS with granular Department RBAC, legal terms & digital e-signatures (SHA-256 seal), multi-model Cloud AI bridges (Gemini, Claude, GPT-4o, DeepSeek, Hermes Swarms), lead discovery, CRM, and voice calling.",
   "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

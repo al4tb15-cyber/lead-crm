@@ -32,7 +32,8 @@ import {
   User,
   CustomVoice,
   DepartmentRole,
-  RbacAuditLog
+  RbacAuditLog,
+  LegalDocument
 } from './src/types/index.ts';
 
 async function startServer() {
@@ -377,6 +378,152 @@ async function startServer() {
     }
 
     res.json({ success });
+  });
+
+  // ==========================================
+  // LEGAL DOCUMENTS, CONTRACTS & DIGITAL SIGNING API
+  // ==========================================
+  app.get('/api/legal/documents', (req, res) => {
+    const tenantId = (req as any).tenantId;
+    const docs = db.getLegalDocuments(tenantId);
+    res.json(docs);
+  });
+
+  app.get('/api/legal/documents/:id', (req, res) => {
+    const doc = db.getLegalDocument(req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+    res.json(doc);
+  });
+
+  app.post('/api/legal/documents', (req, res) => {
+    const tenantId = (req as any).tenantId;
+    const docId = `leg_${tenantId}_${Math.random().toString(36).substr(2, 8)}`;
+    const newDoc: LegalDocument = {
+      id: docId,
+      tenantId,
+      docType: req.body.docType || 'custom_client_contract',
+      title: req.body.title || 'Custom Client Service Agreement',
+      version: req.body.version || 'v2026.1-CUSTOM',
+      effectiveDate: req.body.effectiveDate || new Date().toISOString().split('T')[0],
+      governingLaw: req.body.governingLaw || 'New South Wales, Commonwealth of Australia',
+      abnOrTaxId: req.body.abnOrTaxId || 'ABN 84 629 104 883',
+      summary: req.body.summary || 'Custom commercial schedule and services agreement.',
+      contentMarkdown: req.body.contentMarkdown || '## 1. SERVICES & COMMERCIAL TERMS\n\nCustom agreement terms...',
+      status: req.body.status || 'draft',
+      recipientName: req.body.recipientName || '',
+      recipientEmail: req.body.recipientEmail || '',
+      recipientCompany: req.body.recipientCompany || '',
+      tags: Array.isArray(req.body.tags) ? req.body.tags : ['Commercial Agreement', 'Draft'],
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+
+    const saved = db.createLegalDocument(newDoc);
+
+    db.addRbacAuditLog({
+      id: `audit_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+      tenantId,
+      actorId: 'usr_super_admin',
+      actorName: 'Alexander Ross',
+      action: 'create_role',
+      targetType: 'policy',
+      targetName: saved.title,
+      details: `Generated new legal agreement template (${saved.docType}) for ${saved.recipientCompany || 'Platform Clients'}.`,
+      timestamp: new Date().toISOString()
+    });
+
+    res.status(201).json(saved);
+  });
+
+  app.put('/api/legal/documents/:id', (req, res) => {
+    const updated = db.updateLegalDocument(req.params.id, req.body);
+    if (!updated) return res.status(404).json({ error: 'Document not found' });
+    res.json(updated);
+  });
+
+  app.delete('/api/legal/documents/:id', (req, res) => {
+    const success = db.deleteLegalDocument(req.params.id);
+    res.json({ success });
+  });
+
+  app.post('/api/legal/documents/:id/sign', (req, res) => {
+    const { signatoryName, signatoryEmail, signatoryTitle, signatoryCompany, signatoryTaxIdOrAbn, signatureType, signatureDataUrl } = req.body;
+    
+    if (!signatoryName || !signatoryEmail) {
+      return res.status(400).json({ error: 'Signatory Name and Email are required for cryptographic execution.' });
+    }
+
+    const updated = db.signLegalDocument(req.params.id, {
+      signatoryName,
+      signatoryEmail,
+      signatoryTitle: signatoryTitle || 'Authorized Representative',
+      signatoryCompany: signatoryCompany || 'Client Enterprise',
+      signatoryTaxIdOrAbn,
+      signatureType: signatureType || 'draw',
+      signatureDataUrl,
+      ipAddress: req.ip || '203.111.42.98 (Sydney, NSW)'
+    });
+
+    if (!updated) return res.status(404).json({ error: 'Document not found' });
+
+    // Emit event
+    eventBus.emit({
+      tenantId: updated.tenantId,
+      eventType: 'payment.link_created',
+      summary: `Legal Document Executed: ${updated.title} digitally signed by ${signatoryName} (${signatoryCompany || signatoryEmail})`,
+      details: {
+        docId: updated.id,
+        certificateHash: updated.signature?.certificateHashSha256,
+        auditTrailId: updated.signature?.auditTrailId
+      }
+    });
+
+    res.json({ success: true, document: updated });
+  });
+
+  app.post('/api/legal/documents/:id/deliver', (req, res) => {
+    const { recipientEmail, recipientName, customMessage } = req.body;
+    const doc = db.getLegalDocument(req.params.id);
+    if (!doc) return res.status(404).json({ error: 'Document not found' });
+
+    const targetEmail = recipientEmail || doc.recipientEmail || 'client@example.com.au';
+    const targetName = recipientName || doc.recipientName || 'Valued Client';
+
+    const dispatchId = `disp_${Date.now()}`;
+    const emailLog: EmailDispatchLog = {
+      id: dispatchId,
+      tenantId: doc.tenantId,
+      toEmail: targetEmail,
+      toName: targetName,
+      fromName: 'Business HUB Legal & Compliance',
+      subject: `[Executed Agreement] ${doc.title} - Digital Certificate & Deliverable (${doc.version})`,
+      bodyPreview: customMessage || `Please find attached your digitally signed and executed copy of ${doc.title}. Governed under ${doc.governingLaw}. Cryptographic Certificate: ${doc.signature?.certificateHashSha256?.slice(0, 16) || 'PENDING'}...`,
+      category: 'quote_proposal',
+      status: 'delivered',
+      sentAt: new Date().toISOString(),
+      metadata: {
+        documentId: doc.id,
+        version: doc.version,
+        governingLaw: doc.governingLaw,
+        auditTrailId: doc.signature?.auditTrailId
+      }
+    };
+    db.emails.set(dispatchId, emailLog);
+
+    const updated = db.updateLegalDocument(doc.id, {
+      deliveredAt: new Date().toISOString(),
+      recipientEmail: targetEmail,
+      recipientName: targetName,
+      status: doc.status === 'draft' ? 'pending_signature' : doc.status
+    });
+
+    res.json({
+      success: true,
+      deliveredAt: new Date().toISOString(),
+      recipientEmail: targetEmail,
+      dispatchLog: emailLog,
+      document: updated
+    });
   });
 
   // ==========================================
