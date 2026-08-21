@@ -49,7 +49,11 @@ export const LegalDocsView: React.FC = () => {
       const docs = await api.getLegalDocuments();
       setDocuments(docs);
     } catch (err: any) {
-      addToast(err.message || 'Failed to load legal agreements.', 'error');
+      addToast({
+        type: 'error',
+        title: 'Document Load Error',
+        message: err.message || 'Failed to load legal agreements.'
+      });
     } finally {
       setLoading(false);
     }
@@ -57,7 +61,7 @@ export const LegalDocsView: React.FC = () => {
 
   useEffect(() => {
     fetchDocuments();
-  }, [activeTenant.id]);
+  }, [activeTenant?.id]);
 
   const handleSignDocument = async (signatureData: {
     signatoryName: string;
@@ -71,7 +75,11 @@ export const LegalDocsView: React.FC = () => {
     if (!signingDoc) return;
     try {
       const res = await api.signLegalDocument(signingDoc.id, signatureData);
-      addToast(`Document successfully signed and cryptographically sealed under SHA-256 cert ${res.document.signature?.auditTrailId}.`, 'success');
+      addToast({
+        type: 'success',
+        title: 'Agreement Digitally Executed',
+        message: `Cryptographically sealed with SHA-256 certificate ${res.document.signature?.auditTrailId}.`
+      });
       setSigningDoc(null);
       await fetchDocuments();
       // Also update preview if open
@@ -79,7 +87,11 @@ export const LegalDocsView: React.FC = () => {
         setPreviewDoc(res.document);
       }
     } catch (err: any) {
-      addToast(err.message || 'Failed to execute digital signature.', 'error');
+      addToast({
+        type: 'error',
+        title: 'Execution Failed',
+        message: err.message || 'Failed to execute digital signature.'
+      });
       throw err;
     }
   };
@@ -87,13 +99,21 @@ export const LegalDocsView: React.FC = () => {
   const handleDeliverDocument = async (docId: string, recipientEmail: string, recipientName: string) => {
     try {
       const res = await api.deliverLegalDocument(docId, { recipientEmail, recipientName });
-      addToast(`Executed legal agreement successfully dispatched to ${recipientEmail}.`, 'success');
+      addToast({
+        type: 'success',
+        title: 'Executed Contract Delivered',
+        message: `Legal agreement dispatched to ${recipientEmail}.`
+      });
       await fetchDocuments();
       if (previewDoc?.id === docId) {
         setPreviewDoc(res.document);
       }
     } catch (err: any) {
-      addToast(err.message || 'Failed to deliver agreement.', 'error');
+      addToast({
+        type: 'error',
+        title: 'Delivery Failed',
+        message: err.message || 'Failed to deliver agreement.'
+      });
       throw err;
     }
   };
@@ -102,16 +122,28 @@ export const LegalDocsView: React.FC = () => {
     try {
       if (editingDoc) {
         await api.updateLegalDocument(editingDoc.id, data);
-        addToast('Legal document updated successfully.', 'success');
+        addToast({
+          type: 'success',
+          title: 'Document Updated',
+          message: 'Legal document updated successfully.'
+        });
       } else {
         await api.createLegalDocument(data);
-        addToast('New legal document schedule created.', 'success');
+        addToast({
+          type: 'success',
+          title: 'Contract Schedule Created',
+          message: 'New legal document schedule created.'
+        });
       }
       setEditingDoc(null);
       setShowCreateModal(false);
       await fetchDocuments();
     } catch (err: any) {
-      addToast(err.message || 'Failed to save document.', 'error');
+      addToast({
+        type: 'error',
+        title: 'Save Failed',
+        message: err.message || 'Failed to save document.'
+      });
       throw err;
     }
   };
@@ -120,10 +152,18 @@ export const LegalDocsView: React.FC = () => {
     if (!window.confirm(`Are you sure you want to delete the agreement "${doc.title}"?`)) return;
     try {
       await api.deleteLegalDocument(doc.id);
-      addToast('Document deleted.', 'info');
+      addToast({
+        type: 'info',
+        title: 'Document Removed',
+        message: 'Document deleted from repository.'
+      });
       await fetchDocuments();
     } catch (err: any) {
-      addToast(err.message || 'Failed to delete document.', 'error');
+      addToast({
+        type: 'error',
+        title: 'Delete Failed',
+        message: err.message || 'Failed to delete document.'
+      });
     }
   };
 

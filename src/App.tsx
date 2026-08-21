@@ -20,6 +20,7 @@ import { PaymentPipelineView } from './components/billing/PaymentPipelineView.ts
 import { CloudApiAndBridgeView } from './components/admin/CloudApiAndBridgeView.tsx';
 import { RemoteAgentWorkspaceView } from './components/bridges/RemoteAgentWorkspaceView.tsx';
 import { ClientPortalView } from './components/client-portal/ClientPortalView.tsx';
+import { SystemDocsView } from './components/docs/SystemDocsView.tsx';
 import { LoginView } from './components/auth/LoginView.tsx';
 import { PublicChatWidgetModal } from './components/chat-widget/PublicChatWidgetModal.tsx';
 import { PublicBookingModal } from './components/booking-page/PublicBookingModal.tsx';
@@ -98,47 +99,64 @@ const AppContent: React.FC = () => {
         />
 
         <main className="flex-1 overflow-y-auto min-w-0 z-0">
-          {currentView === 'dashboard' && <OverviewDashboard onNavigate={setCurrentView} />}
+          {(currentView === 'dashboard' || currentView === 'overview') && (
+            <OverviewDashboard onNavigate={setCurrentView} />
+          )}
           {currentView === 'crm' && (
             <CrmView
               onStartVoiceCall={handleStartVoiceCall}
               onOpenInboxForLead={handleOpenInboxForLead}
             />
           )}
-          {currentView === 'billing' && <PaymentPipelineView />}
-          {currentView === 'cloud_apis' && (
+          {(currentView === 'billing' || currentView === 'payments' || currentView === 'invoices') && (
+            <PaymentPipelineView />
+          )}
+          {(currentView === 'cloud_apis' || currentView === 'cloud_api' || currentView === 'bridges') && (
             <CloudApiAndBridgeView
               onOpenBridgeWorkspace={() => setCurrentView('remote_agent_workspace')}
             />
           )}
-          {currentView === 'remote_agent_workspace' && (
+          {(currentView === 'remote_agent_workspace' || currentView === 'remote_agent' || currentView === 'swarm') && (
             <RemoteAgentWorkspaceView
               onNavigateToCrm={() => setCurrentView('crm')}
               onNavigateToBilling={() => setCurrentView('billing')}
             />
           )}
-          {currentView === 'client_portal' && <ClientPortalView />}
-          {currentView === 'discovery' && (
+          {(currentView === 'client_portal' || currentView === 'portal' || currentView === 'client') && (
+            <ClientPortalView />
+          )}
+          {(currentView === 'discovery' || currentView === 'leads' || currentView === 'leadgen') && (
             <LeadDiscoveryView
               onNavigateToCrm={() => setCurrentView('crm')}
               onStartVoiceCall={handleStartVoiceCall}
             />
           )}
-          {currentView === 'agents' && <AgentsHubView />}
-          {currentView === 'inbox' && <OmnichannelInbox initialLead={activeInboxLead} />}
-          {currentView === 'voice' && (
+          {(currentView === 'agents' || currentView === 'ai_agents') && <AgentsHubView />}
+          {(currentView === 'inbox' || currentView === 'messages') && (
+            <OmnichannelInbox initialLead={activeInboxLead} />
+          )}
+          {(currentView === 'voice' || currentView === 'voice_station') && (
             <VoiceCenterView
               initialLead={activeVoiceLead}
               onNavigateToVoiceStudio={() => setCurrentView('voice_studio')}
             />
           )}
           {currentView === 'voice_studio' && <VoiceStudioView />}
-          {currentView === 'calendar' && <CalendarBookingsView />}
-          {currentView === 'knowledge' && <KnowledgeBaseView />}
+          {(currentView === 'calendar' || currentView === 'bookings') && <CalendarBookingsView />}
+          {(currentView === 'knowledge' || currentView === 'rag') && <KnowledgeBaseView />}
           {currentView === 'campaigns' && <CampaignsView />}
           {currentView === 'analytics' && <AnalyticsView />}
-          {currentView === 'admin' && <PlatformAdminView />}
-          {currentView === 'legal_docs' && <div className="p-6 max-w-7xl mx-auto"><LegalDocsView /></div>}
+          {(currentView === 'admin' || currentView === 'tenants' || currentView === 'workspaces') && (
+            <PlatformAdminView />
+          )}
+          {(currentView === 'legal_docs' || currentView === 'legal' || currentView === 'contracts') && (
+            <div className="p-6 max-w-7xl mx-auto">
+              <LegalDocsView />
+            </div>
+          )}
+          {(currentView === 'docs' || currentView === 'documentation' || currentView === 'runbook') && (
+            <SystemDocsView onNavigate={setCurrentView} />
+          )}
           {currentView === 'settings' && <SettingsView />}
         </main>
       </div>

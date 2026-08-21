@@ -117,6 +117,16 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess }) => {
           </button>
         </div>
 
+        {selectedRole === 'super_admin' && (
+          <div className="p-3 rounded-2xl bg-indigo-500/10 border border-indigo-500/20 text-[11px] text-indigo-200 flex items-start gap-2.5">
+            <ShieldCheck className="w-4 h-4 text-indigo-400 shrink-0 mt-0.5" />
+            <div>
+              <span className="font-bold block text-white">Production Security Enforced</span>
+              <span>Administrator credentials require explicit authentication. 1-Click login is reserved exclusively for sandbox demo accounts below.</span>
+            </div>
+          </div>
+        )}
+
         {/* Login Form */}
         <form onSubmit={handleLogin} className="space-y-4 text-xs">
           <div>
@@ -157,32 +167,42 @@ export const LoginView: React.FC<LoginViewProps> = ({ onSuccess }) => {
           </button>
         </form>
 
-        {/* Quick Demo Access Switchers */}
-        <div className="pt-4 border-t border-white/10 space-y-2">
-          <div className="text-[10px] uppercase font-bold text-white/40 text-center tracking-wider">
-            1-Click Instant Persona Sign-In
+        {/* Quick Demo Access Switchers (Demo Accounts Only - Admin Excluded for Security) */}
+        <div className="pt-4 border-t border-white/10 space-y-2.5">
+          <div className="flex items-center justify-between">
+            <span className="text-[10px] uppercase font-bold text-white/40 tracking-wider">
+              1-Click Demo Account Access
+            </span>
+            <span className="text-[9px] px-2 py-0.5 rounded-full bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-semibold">
+              Demo Only
+            </span>
           </div>
-          <div className="grid grid-cols-3 gap-2 text-[10px]">
-            <button
-              onClick={() => handleQuickDemoLogin('super_admin')}
-              className="p-2 rounded-xl bg-white/[0.03] hover:bg-white/10 border border-white/10 text-center cursor-pointer transition-colors"
-            >
-              <div className="font-bold text-indigo-300">Admin</div>
-              <div className="text-white/40 truncate">Alexander</div>
-            </button>
+
+          <div className="grid grid-cols-2 gap-2 text-[10px]">
             <button
               onClick={() => handleQuickDemoLogin('staff')}
-              className="p-2 rounded-xl bg-white/[0.03] hover:bg-white/10 border border-white/10 text-center cursor-pointer transition-colors"
+              className="p-2.5 rounded-xl bg-purple-500/10 hover:bg-purple-500/20 border border-purple-500/20 text-left cursor-pointer transition-all flex items-center gap-2.5 group"
             >
-              <div className="font-bold text-purple-300">Staff</div>
-              <div className="text-white/40 truncate">Sarah</div>
+              <div className="w-7 h-7 rounded-lg bg-purple-500/20 text-purple-300 flex items-center justify-center font-bold shrink-0">
+                SJ
+              </div>
+              <div className="min-w-0">
+                <div className="font-bold text-purple-300 truncate">Sarah (Sales Ops)</div>
+                <div className="text-white/40 text-[9px] truncate">sarah.jenkins@businesshub.app</div>
+              </div>
             </button>
+
             <button
               onClick={() => handleQuickDemoLogin('client')}
-              className="p-2 rounded-xl bg-white/[0.03] hover:bg-white/10 border border-white/10 text-center cursor-pointer transition-colors"
+              className="p-2.5 rounded-xl bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 text-left cursor-pointer transition-all flex items-center gap-2.5 group"
             >
-              <div className="font-bold text-emerald-300">Client</div>
-              <div className="text-white/40 truncate">James</div>
+              <div className="w-7 h-7 rounded-lg bg-emerald-500/20 text-emerald-300 flex items-center justify-center font-bold shrink-0">
+                JT
+              </div>
+              <div className="min-w-0">
+                <div className="font-bold text-emerald-300 truncate">James (Client)</div>
+                <div className="text-white/40 text-[9px] truncate">james.thornton@apexlegal.com.au</div>
+              </div>
             </button>
           </div>
         </div>

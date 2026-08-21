@@ -47,6 +47,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'client_portal', label: 'Client Dashboard', icon: ShieldCheck, badge: 'Active' },
     { id: 'billing', label: 'Tax Invoices & Receipts', icon: CreditCard, badge: null },
     { id: 'calendar', label: 'Booked Consultations', icon: Calendar, badge: null },
+    { id: 'legal_docs', label: 'Legal Agreements & Terms', icon: FileCheck, badge: null },
     { id: 'inbox', label: 'Advisory Inbox', icon: Inbox, badge: null }
   ];
 
@@ -74,6 +75,7 @@ export const Sidebar: React.FC<SidebarProps> = ({
     { id: 'client_portal', label: 'Client Portal View', icon: ShieldCheck, badge: 'Live Portal', badgeColor: 'bg-cyan-500/20 text-cyan-300' },
     { id: 'admin', label: 'Platform Admin Center', icon: Server, badge: 'Super Admin', badgeColor: 'bg-purple-500/20 text-purple-300' },
     { id: 'legal_docs', label: 'Legal Terms & E-Sign', icon: FileCheck, badge: 'E-Sign', badgeColor: 'bg-blue-500/20 text-blue-300' },
+    { id: 'docs', label: 'System Docs & Runbook', icon: BookOpen, badge: '2026.4', badgeColor: 'bg-amber-500/20 text-amber-300' },
     { id: 'settings', label: 'White-Label & Settings', icon: Settings, badge: null }
   ];
 
