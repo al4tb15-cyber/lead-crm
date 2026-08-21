@@ -603,6 +603,11 @@ export const SystemDocsView: React.FC<SystemDocsViewProps> = ({ onNavigate }) =>
                     <td className="py-2.5 px-3 text-white/60 font-sans">Test latency and ping connectivity for AI key</td>
                   </tr>
                   <tr>
+                    <td className="py-2.5 px-3 text-indigo-400 font-bold">POST</td>
+                    <td className="py-2.5 px-3 text-indigo-300">/api/crm/export</td>
+                    <td className="py-2.5 px-3 text-white/60 font-sans">Statutory bulk CRM export (CSV/JSON) with FIPS 180-4 SHA-256 integrity hash</td>
+                  </tr>
+                  <tr>
                     <td className="py-2.5 px-3 text-emerald-400 font-bold">GET</td>
                     <td className="py-2.5 px-3 text-indigo-300">/api/rbac/audit-logs</td>
                     <td className="py-2.5 px-3 text-white/60 font-sans">Retrieve immutable administrative audit trail</td>

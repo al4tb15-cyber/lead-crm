@@ -23,7 +23,9 @@ import {
   CustomVoice,
   DepartmentRole,
   RbacAuditLog,
-  LegalDocument
+  LegalDocument,
+  CrmExportRequest,
+  CrmExportResponse
 } from '../types/index.ts';
 
 export class ApiClient {
@@ -496,6 +498,14 @@ export class ApiClient {
     return this.request(`/api/legal/documents/${id}/deliver`, {
       method: 'POST',
       body: JSON.stringify(deliveryData)
+    });
+  }
+
+  // CRM Bulk Data Export with SHA-256 Integrity Hash
+  async exportCrmData(payload: CrmExportRequest): Promise<CrmExportResponse> {
+    return this.request<CrmExportResponse>('/api/crm/export', {
+      method: 'POST',
+      body: JSON.stringify(payload)
     });
   }
 

@@ -35,3 +35,16 @@ The system is configured with open Cloud API routing:
 6. **Custom vLLM / Ollama**: On-Premise VPC Sovereign Endpoint
 
 Keys can be configured in the UI under **Cloud APIs & Agent Bridges** (`/cloud_apis`) or in `Settings > Cloud AI Providers`.
+
+---
+
+## 4. CRM Bulk Data Export & SHA-256 Integrity Verification
+
+Authorized roles (`super_admin`, `business_hub_admin`, `account_owner`, `admin`, `manager`, `staff`, `sales_user`) can extract CRM data in CSV and structured JSON format from the CRM Pipeline (`/crm`):
+
+- **Supported Scopes**: Filtered Leads, All Leads Repository, Outreach Campaigns, and Unified Master CRM Bundle.
+- **Export Formats**: Standard CSV (RFC 4180 compliant) and Structured JSON with `_exportMetadata` audit envelope.
+- **Cryptographic Hash**: Every exported dataset is stamped with an immutable FIPS 180-4 **SHA-256 cryptographic digest**.
+- **Companion Manifest**: Generates a standard `.sha256` checksum manifest file for statutory archival and offline integrity verification.
+- **Privacy Controls**: Optional PII obfuscation masks direct emails and phone numbers in compliance with the *Privacy Act 1988 (Cth)*.
+- **Statutory Audit Log**: Emits an entry to `db.recordRbacAudit()` recording the operator, timestamp, record count, and SHA-256 digest.

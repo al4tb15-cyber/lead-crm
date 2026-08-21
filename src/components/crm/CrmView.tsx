@@ -3,6 +3,7 @@ import { useTenant } from '../../context/TenantContext.tsx';
 import { api } from '../../api/client.ts';
 import { Lead, LeadStatus } from '../../types/index.ts';
 import confetti from 'canvas-confetti';
+import { BulkExportModal } from './BulkExportModal.tsx';
 import {
   Search,
   Filter,
@@ -28,7 +29,11 @@ import {
   Send,
   Receipt,
   CreditCard,
-  RotateCcw
+  RotateCcw,
+  Download,
+  ShieldCheck,
+  FileSpreadsheet,
+  Hash
 } from 'lucide-react';
 
 const PIPELINE_STAGES: { id: LeadStatus; label: string; color: string }[] = [
@@ -67,6 +72,7 @@ export const CrmView: React.FC<CrmViewProps> = ({
 
   const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [showNewLeadModal, setShowNewLeadModal] = useState(false);
+  const [showExportModal, setShowExportModal] = useState(false);
   const [showQuickInvoiceModal, setShowQuickInvoiceModal] = useState(false);
   const [invoiceAmount, setInvoiceAmount] = useState('4500');
   const [invoiceDesc, setInvoiceDesc] = useState('AI Revenue OS Retainer & Autonomous Voice Deployment');
@@ -312,6 +318,19 @@ export const CrmView: React.FC<CrmViewProps> = ({
                 Table
               </button>
             </div>
+
+            {/* Bulk Data Export Button */}
+            <button
+              onClick={() => setShowExportModal(true)}
+              className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold border border-white/10 hover:border-white/20 transition-all cursor-pointer shadow-sm group"
+              title="Export leads and campaigns in CSV/JSON format with SHA-256 integrity hash"
+            >
+              <Download className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
+              <span>Export</span>
+              <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-emerald-500/20 text-emerald-300 font-mono font-bold border border-emerald-500/30">
+                SHA-256
+              </span>
+            </button>
 
             {/* Add Lead Button */}
             <button
@@ -1001,6 +1020,18 @@ export const CrmView: React.FC<CrmViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Bulk Data Export Modal with SHA-256 Cryptographic Digest */}
+      <BulkExportModal
+        isOpen={showExportModal}
+        onClose={() => setShowExportModal(false)}
+        filteredLeads={filteredLeads}
+        allLeads={leads}
+        currentSearchQuery={searchQuery}
+        currentStatusFilter={statusFilter}
+        currentIndustryFilter={industryFilter}
+        currentMinScoreFilter={minScoreFilter}
+      />
     </div>
   );
 };

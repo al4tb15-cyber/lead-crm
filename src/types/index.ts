@@ -705,3 +705,59 @@ export interface LegalDocument {
   updatedAt: string;
 }
 
+// ==========================================
+// CRM Bulk Data Export & Integrity Types
+// ==========================================
+export type CrmExportScope = 
+  | 'filtered_leads'
+  | 'all_leads'
+  | 'campaigns'
+  | 'complete_bundle';
+
+export type CrmExportFormat = 'csv' | 'json';
+
+export interface CrmExportRequest {
+  scope: CrmExportScope;
+  format: CrmExportFormat;
+  leadIds?: string[];
+  campaignIds?: string[];
+  anonymizeSensitiveFields?: boolean;
+  includeAuditManifest?: boolean;
+  filtersApplied?: {
+    searchQuery?: string;
+    statusFilter?: string;
+    industryFilter?: string;
+    minScoreFilter?: number;
+  };
+}
+
+export interface CrmExportCertificate {
+  certificateId: string;
+  sha256: string;
+  timestamp: string;
+  exportedBy: string;
+  exportedByEmail: string;
+  exportedByRole: string;
+  tenantId: string;
+  tenantName: string;
+  recordCount: number;
+  scope: CrmExportScope;
+  format: CrmExportFormat;
+  algorithm: string;
+  fileSizeBytes: number;
+  statutoryCompliance: string;
+}
+
+export interface CrmExportResponse {
+  success: boolean;
+  filename: string;
+  mimeType: string;
+  content: string;
+  sha256Hash: string;
+  recordCount: number;
+  scope: CrmExportScope;
+  format: CrmExportFormat;
+  certificate: CrmExportCertificate;
+  manifestContent?: string;
+}
+

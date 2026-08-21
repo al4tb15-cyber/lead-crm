@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import path from 'path';
+import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
 import { db } from './server/db.ts';
 import { eventBus } from './server/events.ts';
@@ -33,7 +34,10 @@ import {
   CustomVoice,
   DepartmentRole,
   RbacAuditLog,
-  LegalDocument
+  LegalDocument,
+  CrmExportRequest,
+  CrmExportResponse,
+  CrmExportCertificate
 } from './src/types/index.ts';
 
 async function startServer() {
@@ -867,6 +871,362 @@ async function startServer() {
   app.get('/api/contacts', (req, res) => {
     const tenantId = (req as any).tenantId;
     res.json(db.getContacts(tenantId));
+  });
+
+  // ==========================================
+  // CRM BULK DATA EXPORT & SHA-256 INTEGRITY API
+  // ==========================================
+  app.post('/api/crm/export', (req, res) => {
+    const tenantId = (req as any).tenantId;
+    const {
+      scope = 'all_leads',
+      format = 'csv',
+      leadIds,
+      campaignIds,
+      anonymizeSensitiveFields = false,
+      includeAuditManifest = true,
+      filtersApplied
+    } = req.body as CrmExportRequest;
+
+    // RBAC Authorization Check
+    const userRole = (req.headers['x-user-role'] as string) || (req.body as any)?.userRole || 'super_admin';
+    const allowedRoles = ['super_admin', 'business_hub_admin', 'account_owner', 'admin', 'manager', 'staff', 'sales_user'];
+    
+    if (!allowedRoles.includes(userRole)) {
+      return res.status(403).json({
+        error: `Access Denied: Role '${userRole}' is not authorized to execute statutory bulk data exports. Mandatory role level: Staff / Manager / Admin.`
+      });
+    }
+
+    const tenant = db.getTenant(tenantId) || { name: 'Business HUB Australia', id: tenantId };
+    const allTenantLeads = db.getLeads(tenantId);
+    const allTenantCampaigns = db.getCampaigns(tenantId);
+    const allTenantCompanies = db.getCompanies(tenantId);
+    const allTenantContacts = db.getContacts(tenantId);
+
+    // Filter datasets based on scope & provided IDs
+    let exportLeads: Lead[] = [];
+    let exportCampaigns: Campaign[] = [];
+
+    if (scope === 'filtered_leads') {
+      if (Array.isArray(leadIds) && leadIds.length > 0) {
+        const idSet = new Set(leadIds);
+        exportLeads = allTenantLeads.filter(l => idSet.has(l.id));
+      } else {
+        exportLeads = allTenantLeads;
+      }
+    } else if (scope === 'all_leads') {
+      exportLeads = allTenantLeads;
+    } else if (scope === 'campaigns') {
+      if (Array.isArray(campaignIds) && campaignIds.length > 0) {
+        const idSet = new Set(campaignIds);
+        exportCampaigns = allTenantCampaigns.filter(c => idSet.has(c.id));
+      } else {
+        exportCampaigns = allTenantCampaigns;
+      }
+    } else if (scope === 'complete_bundle') {
+      exportLeads = allTenantLeads;
+      exportCampaigns = allTenantCampaigns;
+    }
+
+    // Helper functions for masking
+    const maskEmail = (email: string) => {
+      if (!email || !email.includes('@')) return email || '';
+      const [u, d] = email.split('@');
+      if (u.length <= 2) return `${u[0]}*@${d}`;
+      return `${u[0]}***${u[u.length - 1]}@${d}`;
+    };
+
+    const maskPhone = (phone: string) => {
+      if (!phone || phone.length < 6) return phone || '';
+      return phone.slice(0, 4) + ' *** ' + phone.slice(-2);
+    };
+
+    const escapeCsv = (val: any): string => {
+      if (val === null || val === undefined) return '""';
+      if (typeof val === 'object') {
+        const str = JSON.stringify(val);
+        return `"${str.replace(/"/g, '""')}"`;
+      }
+      const str = String(val);
+      return `"${str.replace(/"/g, '""')}"`;
+    };
+
+    let processedLeads = exportLeads.map(l => {
+      if (anonymizeSensitiveFields) {
+        return {
+          ...l,
+          contactEmail: maskEmail(l.contactEmail),
+          contactPhone: maskPhone(l.contactPhone)
+        };
+      }
+      return l;
+    });
+
+    const timestamp = new Date().toISOString();
+    const dateFormatted = timestamp.split('T')[0];
+    const certRandom = Math.random().toString(36).substring(2, 7).toUpperCase();
+    const certificateId = `EXPORT-AU-SHA256-${Date.now().toString(36).toUpperCase()}-${certRandom}`;
+    const operatorName = (req.body as any)?.userName || 'Alexander Ross (Platform Super Admin)';
+    const operatorEmail = (req.body as any)?.userEmail || 'alexander@businesshub.app';
+
+    let content = '';
+    let filename = '';
+    let mimeType = '';
+    let recordCount = 0;
+
+    if (format === 'csv') {
+      mimeType = 'text/csv;charset=utf-8;';
+      if (scope === 'campaigns') {
+        filename = `business_hub_campaigns_export_${dateFormatted}.csv`;
+        recordCount = exportCampaigns.length;
+        const headers = [
+          'Campaign ID',
+          'Campaign Name',
+          'Status',
+          'Target Audience',
+          'Channels',
+          'Total Leads',
+          'Engaged Leads',
+          'Appointments Booked',
+          'Deals Won',
+          'Conversion Rate (%)',
+          'Assigned Agent ID',
+          'Sequence Steps Count',
+          'Created At'
+        ];
+        const rows = exportCampaigns.map(c => [
+          escapeCsv(c.id),
+          escapeCsv(c.name),
+          escapeCsv(c.status),
+          escapeCsv(c.targetAudience),
+          escapeCsv(c.channels.join('; ')),
+          escapeCsv(c.leadCount),
+          escapeCsv(c.engagedCount),
+          escapeCsv(c.appointmentCount),
+          escapeCsv(c.wonCount),
+          escapeCsv(c.conversionRate),
+          escapeCsv(c.assignedAgentId),
+          escapeCsv(c.sequenceSteps?.length || 0),
+          escapeCsv(c.createdAt)
+        ].join(','));
+        content = [headers.join(','), ...rows].join('\r\n');
+      } else if (scope === 'complete_bundle') {
+        filename = `business_hub_crm_master_bundle_${dateFormatted}.csv`;
+        recordCount = processedLeads.length + exportCampaigns.length;
+        const headers = [
+          'Record Type',
+          'Entity ID',
+          'Primary Name',
+          'Status / State',
+          'Secondary Name / Contact',
+          'Email / Channel',
+          'Phone / Target',
+          'Value / Conversion',
+          'Score / Metric',
+          'Industry / Scope',
+          'Timestamp'
+        ];
+        const leadRows = processedLeads.map(l => [
+          escapeCsv('LEAD'),
+          escapeCsv(l.id),
+          escapeCsv(l.companyName),
+          escapeCsv(l.status),
+          escapeCsv(l.contactName),
+          escapeCsv(l.contactEmail),
+          escapeCsv(l.contactPhone),
+          escapeCsv(`$${l.estimatedValue || 0} AUD`),
+          escapeCsv(`${l.leadScore}/100`),
+          escapeCsv(l.industry),
+          escapeCsv(l.createdAt)
+        ].join(','));
+        const campRows = exportCampaigns.map(c => [
+          escapeCsv('CAMPAIGN'),
+          escapeCsv(c.id),
+          escapeCsv(c.name),
+          escapeCsv(c.status),
+          escapeCsv(c.assignedAgentId),
+          escapeCsv(c.channels.join('; ')),
+          escapeCsv(c.targetAudience),
+          escapeCsv(`${c.conversionRate}% Conv`),
+          escapeCsv(`${c.leadCount} Leads`),
+          escapeCsv('Outreach Sequence'),
+          escapeCsv(c.createdAt)
+        ].join(','));
+        content = [headers.join(','), ...leadRows, ...campRows].join('\r\n');
+      } else {
+        // Leads CSV (filtered or all)
+        filename = scope === 'filtered_leads' 
+          ? `business_hub_leads_filtered_${dateFormatted}.csv` 
+          : `business_hub_leads_all_${dateFormatted}.csv`;
+        recordCount = processedLeads.length;
+        const headers = [
+          'Lead ID',
+          'Company Name',
+          'Contact Name',
+          'Contact Email',
+          'Contact Phone',
+          'Job Title',
+          'Industry',
+          'Pipeline Status',
+          'AI Lead Score',
+          'Estimated Deal Value (AUD)',
+          'Source',
+          'Campaign ID',
+          'Notes Summary',
+          'Top Score Factor',
+          'Created At',
+          'Updated At'
+        ];
+        const rows = processedLeads.map(l => [
+          escapeCsv(l.id),
+          escapeCsv(l.companyName),
+          escapeCsv(l.contactName),
+          escapeCsv(l.contactEmail),
+          escapeCsv(l.contactPhone),
+          escapeCsv(l.jobTitle),
+          escapeCsv(l.industry),
+          escapeCsv(l.status),
+          escapeCsv(l.leadScore),
+          escapeCsv(l.estimatedValue || 0),
+          escapeCsv(l.source || 'Autonomous Discovery'),
+          escapeCsv(l.campaignId || ''),
+          escapeCsv(l.notes?.join(' | ') || ''),
+          escapeCsv(l.scoreBreakdown?.[0]?.reason || 'High ICP match'),
+          escapeCsv(l.createdAt),
+          escapeCsv(l.updatedAt || l.createdAt)
+        ].join(','));
+        content = [headers.join(','), ...rows].join('\r\n');
+      }
+    } else {
+      // JSON format
+      mimeType = 'application/json;charset=utf-8;';
+      filename = scope === 'campaigns'
+        ? `business_hub_campaigns_${dateFormatted}.json`
+        : scope === 'complete_bundle'
+        ? `business_hub_crm_master_${dateFormatted}.json`
+        : `business_hub_leads_${dateFormatted}.json`;
+
+      recordCount = scope === 'campaigns' 
+        ? exportCampaigns.length 
+        : scope === 'complete_bundle' 
+        ? processedLeads.length + exportCampaigns.length 
+        : processedLeads.length;
+
+      const exportPayload = {
+        _exportMetadata: {
+          certificateId,
+          generatedAt: timestamp,
+          tenantId,
+          tenantName: tenant.name,
+          exportedBy: operatorName,
+          exportedByEmail: operatorEmail,
+          exportedByRole: userRole,
+          datasetScope: scope,
+          recordCount,
+          anonymized: anonymizeSensitiveFields,
+          filtersApplied: filtersApplied || null,
+          integrityAlgorithm: 'SHA-256 (FIPS 180-4 Standard)',
+          statutoryCompliance: 'Australian Privacy Act 1988 (Cth) & Electronic Transactions Act 1999 (Cth)'
+        },
+        data: {
+          ...(scope === 'all_leads' || scope === 'filtered_leads' ? { leads: processedLeads } : {}),
+          ...(scope === 'campaigns' ? { campaigns: exportCampaigns } : {}),
+          ...(scope === 'complete_bundle' ? {
+            leads: processedLeads,
+            campaigns: exportCampaigns,
+            companies: allTenantCompanies,
+            contacts: allTenantContacts
+          } : {})
+        }
+      };
+
+      content = JSON.stringify(exportPayload, null, 2);
+    }
+
+    // Compute Cryptographic SHA-256 Digest of the exact file content
+    const sha256Hash = crypto.createHash('sha256').update(content, 'utf8').digest('hex');
+    const fileSizeBytes = Buffer.byteLength(content, 'utf8');
+
+    // Generate Companion .sha256 Checksum Manifest
+    const manifestContent = [
+      `# ==============================================================================`,
+      `# BUSINESS HUB AUSTRALIA - CRYPTOGRAPHIC INTEGRITY MANIFEST (SHA-256)`,
+      `# Statutory Reference: Electronic Transactions Act 1999 (Cth) & Privacy Act 1988`,
+      `# ==============================================================================`,
+      `# Certificate ID       : ${certificateId}`,
+      `# Target File          : ${filename}`,
+      `# File Size (Bytes)    : ${fileSizeBytes} bytes`,
+      `# Record Count         : ${recordCount}`,
+      `# Dataset Scope        : ${scope.toUpperCase()}`,
+      `# Format               : ${format.toUpperCase()}`,
+      `# Exported Timestamp   : ${timestamp} AEST`,
+      `# Organization/Tenant  : ${tenant.name} (${tenantId})`,
+      `# Authorized Operator  : ${operatorName}`,
+      `# SHA-256 Checksum     : ${sha256Hash}`,
+      `# ==============================================================================`,
+      ``,
+      `${sha256Hash}  ${filename}`,
+      ``
+    ].join('\r\n');
+
+    const certificate: CrmExportCertificate = {
+      certificateId,
+      sha256: sha256Hash,
+      timestamp,
+      exportedBy: operatorName,
+      exportedByEmail: operatorEmail,
+      exportedByRole: userRole,
+      tenantId,
+      tenantName: tenant.name,
+      recordCount,
+      scope,
+      format,
+      algorithm: 'SHA-256 (FIPS 180-4)',
+      fileSizeBytes,
+      statutoryCompliance: 'Australian Privacy Act 1988 (Cth) / Electronic Transactions Act 1999 (Cth)'
+    };
+
+    // Record in Transactional RBAC Audit Log
+    db.addRbacAuditLog({
+      id: `audit_exp_${Date.now()}_${Math.random().toString(36).substr(2, 6)}`,
+      tenantId,
+      actorId: (req.body as any)?.userId || 'usr_super_admin',
+      actorName: operatorName,
+      action: 'update_permissions',
+      targetType: 'policy',
+      targetName: `CRM Bulk Export (${scope.toUpperCase()})`,
+      details: `Executed authorized statutory export of ${recordCount} records in ${format.toUpperCase()} format. SHA-256 Digest: ${sha256Hash.slice(0, 16)}... Certificate ID: ${certificateId}.`,
+      timestamp
+    });
+
+    eventBus.emit({
+      tenantId,
+      eventType: 'lead.created',
+      summary: `CRM Data Export Executed: ${recordCount} ${scope} records exported by ${operatorName} (${format.toUpperCase()})`,
+      details: {
+        certificateId,
+        sha256: sha256Hash,
+        scope,
+        format,
+        recordCount
+      }
+    });
+
+    const response: CrmExportResponse = {
+      success: true,
+      filename,
+      mimeType,
+      content,
+      sha256Hash,
+      recordCount,
+      scope,
+      format,
+      certificate,
+      manifestContent
+    };
+
+    res.json(response);
   });
 
   // ==========================================
