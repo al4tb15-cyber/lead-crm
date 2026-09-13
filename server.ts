@@ -1,6 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
 import path from 'path';
+import fs from 'fs';
 import crypto from 'crypto';
 import { createServer as createViteServer } from 'vite';
 import { db } from './server/db.ts';
@@ -42,7 +43,8 @@ import {
 
 async function startServer() {
   const app = express();
-  const PORT = 3000;
+  // Support dynamic PORT via environment variable (cPanel, Passenger, PM2, or custom host) with fallback to 3000
+  const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 
   app.use(express.json());
 
@@ -55,12 +57,36 @@ async function startServer() {
     next();
   });
 
-  // Health check
+  // Health check & Diagnostics
   app.get('/api/health', (req, res) => {
     res.json({
       status: 'ok',
       service: 'Business HUB AI Revenue OS',
       domain: 'portal.businesshub.app',
+      timestamp: new Date().toISOString()
+    });
+  });
+
+  app.get('/api/diagnostics', (req, res) => {
+    const candidateDirs = [
+      path.join(process.cwd(), 'dist'),
+      path.resolve(__dirname),
+      path.resolve(__dirname, 'dist'),
+      path.resolve(__dirname, '..', 'dist'),
+      path.resolve(process.cwd())
+    ];
+    const locatedDist = candidateDirs.find(d => fs.existsSync(path.join(d, 'index.html'))) || 'not-found';
+    res.json({
+      status: 'operational',
+      nodeVersion: process.version,
+      cwd: process.cwd(),
+      dirname: __dirname,
+      locatedDistPath: locatedDist,
+      distExists: locatedDist !== 'not-found',
+      env: {
+        NODE_ENV: process.env.NODE_ENV,
+        PORT: PORT
+      },
       timestamp: new Date().toISOString()
     });
   });
@@ -873,6 +899,31 @@ async function startServer() {
     res.json(db.getContacts(tenantId));
   });
 
+  app.get('/api/crm/activity-report', (req, res) => {
+    const tenantId = (req as any).tenantId;
+    const allTenantLeads = db.getLeads(tenantId);
+    const allTenantEvents = db.getEvents(tenantId);
+
+    const activityItems = allTenantEvents.map(e => {
+      const matchedLead = e.details?.leadId ? allTenantLeads.find(l => l.id === e.details.leadId) : undefined;
+      return {
+        id: e.id,
+        timestamp: e.timestamp,
+        eventType: e.eventType,
+        summary: e.summary,
+        leadId: e.details?.leadId || matchedLead?.id || '',
+        companyName: e.details?.companyName || matchedLead?.companyName || 'Pipeline Prospect',
+        contactName: e.details?.contactName || matchedLead?.contactName || '',
+        triggeredBy: e.triggeredByAgent || 'Autonomous AI Orchestrator',
+        value: e.details?.value || matchedLead?.estimatedValue || 0,
+        status: e.details?.status || 'completed',
+        details: e.details || {}
+      };
+    });
+
+    res.json(activityItems);
+  });
+
   // ==========================================
   // CRM BULK DATA EXPORT & SHA-256 INTEGRITY API
   // ==========================================
@@ -907,6 +958,25 @@ async function startServer() {
     // Filter datasets based on scope & provided IDs
     let exportLeads: Lead[] = [];
     let exportCampaigns: Campaign[] = [];
+    let exportActivityEvents: any[] = [];
+
+    const allTenantEvents = db.getEvents(tenantId);
+    exportActivityEvents = allTenantEvents.map(e => {
+      const matchedLead = e.details?.leadId ? allTenantLeads.find(l => l.id === e.details.leadId) : undefined;
+      return {
+        id: e.id,
+        timestamp: e.timestamp,
+        eventType: e.eventType,
+        summary: e.summary,
+        leadId: e.details?.leadId || matchedLead?.id || '',
+        companyName: e.details?.companyName || matchedLead?.companyName || 'Pipeline Prospect',
+        contactName: e.details?.contactName || matchedLead?.contactName || '',
+        triggeredBy: e.triggeredByAgent || 'Autonomous AI Orchestrator',
+        value: e.details?.value || matchedLead?.estimatedValue || 0,
+        status: e.details?.status || 'completed',
+        details: e.details || {}
+      };
+    });
 
     if (scope === 'filtered_leads') {
       if (Array.isArray(leadIds) && leadIds.length > 0) {
@@ -927,6 +997,8 @@ async function startServer() {
     } else if (scope === 'complete_bundle') {
       exportLeads = allTenantLeads;
       exportCampaigns = allTenantCampaigns;
+    } else if (scope === 'activity_reports') {
+      // Activity reports scope uses exportActivityEvents
     }
 
     // Helper functions for masking
@@ -1054,6 +1126,34 @@ async function startServer() {
           escapeCsv(c.createdAt)
         ].join(','));
         content = [headers.join(','), ...leadRows, ...campRows].join('\r\n');
+      } else if (scope === 'activity_reports') {
+        filename = `business_hub_activity_report_${dateFormatted}.csv`;
+        recordCount = exportActivityEvents.length;
+        const headers = [
+          'Activity ID',
+          'Timestamp (ISO)',
+          'Date & Time (AEST)',
+          'Activity Type',
+          'Summary & Description',
+          'Related Prospect / Company',
+          'Contact Name',
+          'Executed By',
+          'Deal Value (AUD)',
+          'Status'
+        ];
+        const rows = exportActivityEvents.map(act => [
+          escapeCsv(act.id),
+          escapeCsv(act.timestamp),
+          escapeCsv(new Date(act.timestamp).toLocaleString('en-AU', { timeZone: 'Australia/Sydney' })),
+          escapeCsv(act.eventType),
+          escapeCsv(act.summary),
+          escapeCsv(act.companyName),
+          escapeCsv(act.contactName),
+          escapeCsv(act.triggeredBy),
+          escapeCsv(act.value ? `$${act.value} AUD` : ''),
+          escapeCsv(act.status)
+        ].join(','));
+        content = [headers.join(','), ...rows].join('\r\n');
       } else {
         // Leads CSV (filtered or all)
         filename = scope === 'filtered_leads' 
@@ -1098,6 +1198,34 @@ async function startServer() {
         ].join(','));
         content = [headers.join(','), ...rows].join('\r\n');
       }
+    } else if (format === 'pdf') {
+      // PDF format metadata & payload
+      mimeType = 'application/pdf';
+      filename = scope === 'activity_reports'
+        ? `business_hub_activity_report_${dateFormatted}.pdf`
+        : scope === 'campaigns'
+        ? `business_hub_campaigns_${dateFormatted}.pdf`
+        : `business_hub_leads_${dateFormatted}.pdf`;
+
+      recordCount = scope === 'activity_reports'
+        ? exportActivityEvents.length
+        : scope === 'campaigns'
+        ? exportCampaigns.length
+        : processedLeads.length;
+
+      const pdfPayload = {
+        title: scope === 'activity_reports' ? 'CRM Activity & Telemetry Report' : 'CRM Executive Leads Report',
+        metadata: {
+          certificateId,
+          generatedAt: timestamp,
+          tenantId,
+          tenantName: tenant.name,
+          exportedBy: operatorName,
+          recordCount
+        },
+        items: scope === 'activity_reports' ? exportActivityEvents : processedLeads
+      };
+      content = JSON.stringify(pdfPayload, null, 2);
     } else {
       // JSON format
       mimeType = 'application/json;charset=utf-8;';
@@ -1105,12 +1233,16 @@ async function startServer() {
         ? `business_hub_campaigns_${dateFormatted}.json`
         : scope === 'complete_bundle'
         ? `business_hub_crm_master_${dateFormatted}.json`
+        : scope === 'activity_reports'
+        ? `business_hub_activity_report_${dateFormatted}.json`
         : `business_hub_leads_${dateFormatted}.json`;
 
       recordCount = scope === 'campaigns' 
         ? exportCampaigns.length 
         : scope === 'complete_bundle' 
         ? processedLeads.length + exportCampaigns.length 
+        : scope === 'activity_reports'
+        ? exportActivityEvents.length
         : processedLeads.length;
 
       const exportPayload = {
@@ -1132,9 +1264,11 @@ async function startServer() {
         data: {
           ...(scope === 'all_leads' || scope === 'filtered_leads' ? { leads: processedLeads } : {}),
           ...(scope === 'campaigns' ? { campaigns: exportCampaigns } : {}),
+          ...(scope === 'activity_reports' ? { activities: exportActivityEvents } : {}),
           ...(scope === 'complete_bundle' ? {
             leads: processedLeads,
             campaigns: exportCampaigns,
+            activities: exportActivityEvents,
             companies: allTenantCompanies,
             contacts: allTenantContacts
           } : {})
@@ -1857,10 +1991,61 @@ async function startServer() {
     });
     app.use(vite.middlewares);
   } else {
-    const distPath = path.join(process.cwd(), 'dist');
+    // Robust resolution of dist folder across diverse cPanel/Passenger/PM2 hosting setups
+    const candidateDirs = [
+      path.join(process.cwd(), 'dist'),
+      path.resolve(__dirname), // in bundled dist/server.cjs, __dirname is already the dist folder
+      path.resolve(__dirname, 'dist'),
+      path.resolve(__dirname, '..', 'dist'),
+      path.resolve(process.cwd())
+    ];
+    const distPath = candidateDirs.find(dir => fs.existsSync(path.join(dir, 'index.html'))) || path.join(process.cwd(), 'dist');
+    const indexHtmlPath = path.join(distPath, 'index.html');
+    const hasBuiltFiles = fs.existsSync(indexHtmlPath);
+
+    console.log(`[Business HUB Server] Production mode: Serving static frontend from "${distPath}" (exists: ${hasBuiltFiles})`);
+
     app.use(express.static(distPath));
     app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+      if (fs.existsSync(indexHtmlPath)) {
+        res.sendFile(indexHtmlPath);
+      } else {
+        res.status(503).send(`
+          <!DOCTYPE html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <title>Business HUB Australia - Setup Notice</title>
+            <style>
+              body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #090d16; color: #e2e8f0; margin: 0; padding: 40px 20px; display: flex; justify-content: center; }
+              .card { max-width: 640px; background: #131b2e; border: 1px solid #1e293b; border-radius: 16px; padding: 32px; box-shadow: 0 10px 25px rgba(0,0,0,0.5); }
+              h1 { color: #38bdf8; font-size: 22px; margin-top: 0; }
+              p { line-height: 1.6; font-size: 15px; color: #94a3b8; }
+              code { background: #0a0e1a; color: #34d399; padding: 3px 8px; border-radius: 6px; font-size: 13px; border: 1px solid #1e293b; }
+              .badge { display: inline-block; background: #065f46; color: #6ee7b7; padding: 4px 12px; border-radius: 9999px; font-size: 12px; font-weight: 600; margin-bottom: 16px; }
+              ol { color: #cbd5e1; padding-left: 20px; line-height: 1.8; }
+            </style>
+          </head>
+          <body>
+            <div class="card">
+              <span class="badge">Backend Express Server Active</span>
+              <h1>Production Assets Compilation Required</h1>
+              <p>The Node.js server is running successfully, but the compiled frontend file (<code>index.html</code>) was not found in <code>${distPath}</code>.</p>
+              <p><strong>To resolve this and launch the full portal:</strong></p>
+              <ol>
+                <li>Open your cPanel Terminal or SSH connection.</li>
+                <li>Ensure you are in the application folder: <code>cd ${process.cwd()}</code></li>
+                <li>Run the build command: <code>npm run build</code> (or run <code>bash cpanel-install.sh</code>)</li>
+                <li>In cPanel <strong>Setup Node.js App</strong>, click <strong>Restart</strong>.</li>
+              </ol>
+              <p style="margin-top: 24px; font-size: 13px; color: #64748b;">
+                Diagnostics: CWD=<code>${process.cwd()}</code> | Checked=<code>${indexHtmlPath}</code>
+              </p>
+            </div>
+          </body>
+          </html>
+        `);
+      }
     });
   }
 

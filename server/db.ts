@@ -369,6 +369,10 @@ class DatabaseStore {
     this.seedCustomVoices(bhId);
     this.seedCustomVoices(apexId);
     this.seedCustomVoices(nexusId);
+
+    // Seed CRM Activity & Platform Events
+    this.seedEventsData(bhId);
+    this.seedEventsData(apexId);
   }
 
   seedCustomVoices(tenantId: string) {
@@ -1296,6 +1300,120 @@ Setup Fees: Standard onboarding fee is $1,500 AUD which includes custom prompt c
     };
 
     this.campaigns.set(c1.id, c1);
+  }
+
+  seedEventsData(tenantId: string) {
+    const leads = this.getLeads(tenantId);
+    const l1 = leads[0];
+    const l2 = leads[1];
+    const l3 = leads[2];
+    const l4 = leads[3];
+
+    const now = Date.now();
+    const seeded: PlatformEvent[] = [
+      {
+        id: `evt_1_${tenantId}`,
+        tenantId,
+        eventType: 'lead.won',
+        summary: `Deal Closed & Contract Executed: ${l1 ? l1.companyName : 'CleanGrid Energy Solutions'} ($${l1?.estimatedValue || 45000} AUD)`,
+        details: {
+          leadId: l1?.id,
+          companyName: l1?.companyName || 'CleanGrid Energy Solutions',
+          contactName: l1?.contactName || 'Marcus Brody',
+          value: l1?.estimatedValue || 45000,
+          notes: 'Executive terms signed via Digital Signature Repository.'
+        },
+        triggeredByAgent: 'Alexander Ross (Managing Director)',
+        timestamp: new Date(now - 3600000 * 2).toISOString()
+      },
+      {
+        id: `evt_2_${tenantId}`,
+        tenantId,
+        eventType: 'appointment.created',
+        summary: `Strategic Executive Briefing booked with ${l2 ? l2.contactName : 'Dr. Elena Vance'} (${l2 ? l2.companyName : 'Pacific Minerals Corp'})`,
+        details: {
+          leadId: l2?.id,
+          companyName: l2?.companyName || 'Pacific Minerals Corp',
+          contactName: l2?.contactName || 'Dr. Elena Vance',
+          value: l2?.estimatedValue || 35000,
+          time: 'Tomorrow at 10:00 AM AEST'
+        },
+        triggeredByAgent: 'Voice AI SDR (Charlotte Vance)',
+        timestamp: new Date(now - 3600000 * 5).toISOString()
+      },
+      {
+        id: `evt_3_${tenantId}`,
+        tenantId,
+        eventType: 'call.completed',
+        summary: `Inbound qualification call completed with ${l3 ? l3.contactName : 'Nathan Drake'} (${l3 ? l3.companyName : 'Kallista Renewables'}) - Duration: 4m 12s`,
+        details: {
+          leadId: l3?.id,
+          companyName: l3?.companyName || 'Kallista Renewables',
+          contactName: l3?.contactName || 'Nathan Drake',
+          durationSeconds: 252,
+          sentiment: 'High Intent',
+          callSummary: 'Prospect confirmed $25k budget and requested technical documentation.'
+        },
+        triggeredByAgent: 'Voice AI Specialist (Alex Sterling Cloned)',
+        timestamp: new Date(now - 3600000 * 9).toISOString()
+      },
+      {
+        id: `evt_4_${tenantId}`,
+        tenantId,
+        eventType: 'lead.qualified',
+        summary: `AI ICP Qualification completed: ${l4 ? l4.companyName : 'Apex AgriTech'} scored 88/100`,
+        details: {
+          leadId: l4?.id,
+          companyName: l4?.companyName || 'Apex AgriTech',
+          score: 88,
+          reasons: ['Revenue > $5M AUD', 'Australian operations', 'Decision-maker identified']
+        },
+        triggeredByAgent: 'Hermes 3 Revenue Orchestrator',
+        timestamp: new Date(now - 3600000 * 14).toISOString()
+      },
+      {
+        id: `evt_5_${tenantId}`,
+        tenantId,
+        eventType: 'invoice.issued',
+        summary: `Statutory Tax Invoice INV-2026-0041 dispatched under AU_GST ($4,950 AUD)`,
+        details: {
+          invoiceNumber: 'INV-2026-0041',
+          recipient: l1?.contactName || 'Marcus Brody',
+          companyName: l1?.companyName || 'CleanGrid Energy Solutions',
+          amountAud: 4950
+        },
+        triggeredByAgent: 'Stripe & Billing Automation',
+        timestamp: new Date(now - 3600000 * 20).toISOString()
+      },
+      {
+        id: `evt_6_${tenantId}`,
+        tenantId,
+        eventType: 'email.sent',
+        summary: `Targeted Value Proposition email dispatched to ${l2 ? l2.contactName : 'Dr. Elena Vance'} (Open tracking enabled)`,
+        details: {
+          leadId: l2?.id,
+          recipientEmail: l2?.contactEmail,
+          subject: 'Clean Energy Revenue Scaling in NSW'
+        },
+        triggeredByAgent: 'Autonomous Campaign Engine',
+        timestamp: new Date(now - 3600000 * 28).toISOString()
+      },
+      {
+        id: `evt_7_${tenantId}`,
+        tenantId,
+        eventType: 'lead.created',
+        summary: `Discovered and ingested new enterprise prospect: ${l3 ? l3.companyName : 'Kallista Renewables'}`,
+        details: {
+          leadId: l3?.id,
+          companyName: l3?.companyName || 'Kallista Renewables',
+          source: 'OpenClaw Autonomous Crawler'
+        },
+        triggeredByAgent: 'OpenClaw Swarm Bus',
+        timestamp: new Date(now - 3600000 * 36).toISOString()
+      }
+    ];
+
+    seeded.forEach(e => this.events.push(e));
   }
 
   logEvent(event: PlatformEvent) {

@@ -17,7 +17,8 @@ import {
   CalendarCheck,
   Activity,
   Zap,
-  DollarSign
+  DollarSign,
+  Target
 } from 'lucide-react';
 
 interface WidgetCustomizerModalProps {
@@ -31,6 +32,7 @@ interface WidgetCustomizerModalProps {
 const WIDGET_ICONS: Record<DashboardWidgetId, React.ElementType> = {
   key_metrics: TrendingUp,
   quick_actions: Zap,
+  team_lead_conversions: Target,
   pipeline_funnel: BarChart3,
   global_revenue_map: DollarSign,
   call_sentiment_chart: PhoneCall,

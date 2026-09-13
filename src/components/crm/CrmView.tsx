@@ -323,12 +323,12 @@ export const CrmView: React.FC<CrmViewProps> = ({
             <button
               onClick={() => setShowExportModal(true)}
               className="flex items-center gap-2 px-3.5 py-2 rounded-2xl bg-white/10 hover:bg-white/15 text-white text-xs font-semibold border border-white/10 hover:border-white/20 transition-all cursor-pointer shadow-sm group"
-              title="Export leads and campaigns in CSV/JSON format with SHA-256 integrity hash"
+              title="Export leads and activity reports in CSV or PDF format with SHA-256 integrity verification"
             >
               <Download className="w-4 h-4 text-emerald-400 group-hover:scale-110 transition-transform" />
               <span>Export</span>
               <span className="text-[10px] px-1.5 py-0.2 rounded-md bg-emerald-500/20 text-emerald-300 font-mono font-bold border border-emerald-500/30">
-                SHA-256
+                CSV / PDF
               </span>
             </button>
 

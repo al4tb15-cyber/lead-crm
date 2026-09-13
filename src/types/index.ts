@@ -575,6 +575,7 @@ export type TaxJurisdiction =
 export type DashboardWidgetId = 
   | 'key_metrics'
   | 'quick_actions'
+  | 'team_lead_conversions'
   | 'pipeline_funnel'
   | 'global_revenue_map'
   | 'call_sentiment_chart'
@@ -712,9 +713,24 @@ export type CrmExportScope =
   | 'filtered_leads'
   | 'all_leads'
   | 'campaigns'
-  | 'complete_bundle';
+  | 'complete_bundle'
+  | 'activity_reports';
 
-export type CrmExportFormat = 'csv' | 'json';
+export type CrmExportFormat = 'csv' | 'json' | 'pdf';
+
+export interface CrmActivityLogItem {
+  id: string;
+  timestamp: string;
+  eventType: string;
+  summary: string;
+  leadId?: string;
+  companyName?: string;
+  contactName?: string;
+  triggeredBy?: string;
+  value?: number;
+  status?: string;
+  details?: Record<string, any>;
+}
 
 export interface CrmExportRequest {
   scope: CrmExportScope;

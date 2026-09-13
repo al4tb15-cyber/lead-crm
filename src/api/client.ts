@@ -25,7 +25,8 @@ import {
   RbacAuditLog,
   LegalDocument,
   CrmExportRequest,
-  CrmExportResponse
+  CrmExportResponse,
+  CrmActivityLogItem
 } from '../types/index.ts';
 
 export class ApiClient {
@@ -507,6 +508,10 @@ export class ApiClient {
       method: 'POST',
       body: JSON.stringify(payload)
     });
+  }
+
+  async getActivityReport(): Promise<CrmActivityLogItem[]> {
+    return this.request<CrmActivityLogItem[]>('/api/crm/activity-report');
   }
 
   // Events & Analytics

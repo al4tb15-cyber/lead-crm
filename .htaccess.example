@@ -1,0 +1,34 @@
+# ==============================================================================
+# Business HUB Australia - cPanel Apache / LiteSpeed Configuration
+# ==============================================================================
+# NOTE: If you are using cPanel's GUI "Setup Node.js App", cPanel will 
+# automatically generate Passenger directives in .htaccess.
+#
+# If you are running the app via PM2 or a standalone process on a custom port
+# (e.g. 3000, 3001, 8080, or whatever is free) and need Apache / LiteSpeed to
+# reverse-proxy traffic to that port, use the configuration below (replace 3000
+# with your chosen port):
+# ==============================================================================
+
+<IfModule mod_rewrite.c>
+    RewriteEngine On
+
+    # Exclude SSL Let's Encrypt / cPanel AutoSSL challenges
+    RewriteCond %{REQUEST_URI} ^/.well-known/acme-challenge/ [NC]
+    RewriteRule ^ - [L]
+
+    # Forward WebSocket connections (if applicable) - replace 3000 with your PORT
+    RewriteCond %{HTTP:Upgrade} =websocket [NC]
+    RewriteRule /(.*)           ws://127.0.0.1:3000/$1 [P,L]
+
+    # Proxy all standard HTTP / API requests to local Node.js port (replace 3000 with your PORT)
+    RewriteCond %{REQUEST_FILENAME} !-f
+    RewriteCond %{REQUEST_FILENAME} !-d
+    RewriteRule ^(.*)$ http://127.0.0.1:3000/$1 [P,L]
+</IfModule>
+
+<IfModule mod_proxy.c>
+    ProxyPreserveHost On
+    ProxyRequests Off
+    ProxyTimeout 300
+</IfModule>

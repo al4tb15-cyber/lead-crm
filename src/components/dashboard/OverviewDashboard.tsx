@@ -17,6 +17,7 @@ import {
   convertFromAud
 } from '../../utils/currencyAndTax.ts';
 import { WidgetCustomizerModal } from './WidgetCustomizerModal.tsx';
+import { TeamLeadConversionsWidget } from './TeamLeadConversionsWidget.tsx';
 import {
   TrendingUp,
   Users,
@@ -42,7 +43,8 @@ import {
   Search,
   Inbox,
   CheckCircle2,
-  AlertCircle
+  AlertCircle,
+  Target
 } from 'lucide-react';
 
 interface OverviewDashboardProps {
@@ -52,14 +54,15 @@ interface OverviewDashboardProps {
 const DEFAULT_WIDGETS: DashboardWidgetConfig[] = [
   { id: 'key_metrics', title: 'Executive Revenue KPIs', category: 'metric', enabled: true, order: 0, width: 'full', pinned: true },
   { id: 'quick_actions', title: 'Autonomous Action Launchpad', category: 'action', enabled: true, order: 1, width: 'full', pinned: true },
-  { id: 'pipeline_funnel', title: 'Lead Pipeline & Conversion Flow', category: 'chart', enabled: true, order: 2, width: 'half', pinned: true },
-  { id: 'global_revenue_map', title: 'Global Multi-Currency & Tax Jurisdiction', category: 'chart', enabled: true, order: 3, width: 'half', pinned: true },
-  { id: 'call_sentiment_chart', title: 'AI Voice Call Sentiment & Quality (MOS)', category: 'chart', enabled: true, order: 4, width: 'half', pinned: false },
-  { id: 'token_metering_chart', title: 'AI Token Consumption & Swarm Metering', category: 'chart', enabled: true, order: 5, width: 'half', pinned: false },
-  { id: 'swarm_cluster_hud', title: 'Hermes & OpenClaw Swarm Telemetry', category: 'system', enabled: true, order: 6, width: 'third', pinned: false },
-  { id: 'tax_compliance_summary', title: 'Global Tax & Legal Terms Status', category: 'system', enabled: true, order: 7, width: 'third', pinned: false },
-  { id: 'upcoming_bookings', title: 'Real-Time Booked Consultations', category: 'feed', enabled: true, order: 8, width: 'third', pinned: false },
-  { id: 'live_activity_feed', title: 'Autonomous Multi-Agent Activity Stream', category: 'feed', enabled: true, order: 9, width: 'full', pinned: true }
+  { id: 'team_lead_conversions', title: 'Team Lead Conversion & Weekly Goal Progress', category: 'chart', enabled: true, order: 2, width: 'full', pinned: true },
+  { id: 'pipeline_funnel', title: 'Lead Pipeline & Conversion Flow', category: 'chart', enabled: true, order: 3, width: 'half', pinned: true },
+  { id: 'global_revenue_map', title: 'Global Multi-Currency & Tax Jurisdiction', category: 'chart', enabled: true, order: 4, width: 'half', pinned: true },
+  { id: 'call_sentiment_chart', title: 'AI Voice Call Sentiment & Quality (MOS)', category: 'chart', enabled: true, order: 5, width: 'half', pinned: false },
+  { id: 'token_metering_chart', title: 'AI Token Consumption & Swarm Metering', category: 'chart', enabled: true, order: 6, width: 'half', pinned: false },
+  { id: 'swarm_cluster_hud', title: 'Hermes & OpenClaw Swarm Telemetry', category: 'system', enabled: true, order: 7, width: 'third', pinned: false },
+  { id: 'tax_compliance_summary', title: 'Global Tax & Legal Terms Status', category: 'system', enabled: true, order: 8, width: 'third', pinned: false },
+  { id: 'upcoming_bookings', title: 'Real-Time Booked Consultations', category: 'feed', enabled: true, order: 9, width: 'third', pinned: false },
+  { id: 'live_activity_feed', title: 'Autonomous Multi-Agent Activity Stream', category: 'feed', enabled: true, order: 10, width: 'full', pinned: true }
 ];
 
 export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ onNavigate }) => {
@@ -380,6 +383,18 @@ export const OverviewDashboard: React.FC<OverviewDashboardProps> = ({ onNavigate
                     </button>
                   </div>
                 </div>
+              )}
+
+              {/* WIDGET: TEAM LEAD CONVERSION & WEEKLY GOALS (RECHARTS) */}
+              {widget.id === 'team_lead_conversions' && (
+                <TeamLeadConversionsWidget
+                  leads={leads}
+                  appointments={appointments}
+                  selectedCurrency={selectedCurrency}
+                  pinned={widget.pinned}
+                  onTogglePin={() => togglePinWidget('team_lead_conversions')}
+                  onNavigate={onNavigate}
+                />
               )}
 
               {/* WIDGET 3: PIPELINE FUNNEL CHART */}
